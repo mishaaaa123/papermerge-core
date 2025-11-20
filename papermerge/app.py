@@ -5,6 +5,9 @@ from logging.config import dictConfig
 import yaml
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 from papermerge.core.router_loader import discover_routers
 from papermerge.core.version import __version__
@@ -12,10 +15,16 @@ from papermerge.core.config import get_settings
 from papermerge.core.routers.version import router as version_router
 from papermerge.core.routers.scopes import router as scopes_router
 from papermerge.core.openapi import create_custom_openapi_generator
+from papermerge.core.rate_limiter import limiter
 
 config = get_settings()
 prefix = config.papermerge__main__api_prefix
 app = FastAPI(title="Papermerge DMS REST API", version=__version__)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+if limiter.enabled:
+    app.add_middleware(SlowAPIMiddleware)
 
 app.add_middleware(
     CORSMiddleware,

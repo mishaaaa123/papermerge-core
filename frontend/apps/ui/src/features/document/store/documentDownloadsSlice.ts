@@ -1,6 +1,8 @@
 // src/store/documentSlice.ts
 import {RootState} from "@/app/types"
 import axios from "@/httpClient"
+import type {AxiosError} from "axios"
+import {notifications} from "@mantine/notifications"
 import {getBaseURL} from "@/utils"
 import {createAsyncThunk, createSlice} from "@reduxjs/toolkit"
 
@@ -69,7 +71,31 @@ export const fetchAndDownloadDocument = createAsyncThunk<
 
       window.URL.revokeObjectURL(blobUrl) // Cleanup
     } catch (err: any) {
-      return rejectWithValue(err.message || "Download failed")
+      let errorMessage = "Download failed"
+      const axiosError = err as AxiosError<{detail?: string}>
+
+      if (axiosError?.response) {
+        if (axiosError.response.status === 429) {
+          errorMessage =
+            axiosError.response.data?.detail ||
+            "You've reached the download rate limit. Please try again in a moment."
+        } else {
+          errorMessage =
+            axiosError.response.data?.detail ||
+            axiosError.message ||
+            "Download failed"
+        }
+      } else if (axiosError?.message) {
+        errorMessage = axiosError.message
+      }
+
+      notifications.show({
+        color: "red",
+        title: "Download blocked",
+        message: errorMessage
+      })
+
+      return rejectWithValue(errorMessage)
     }
   },
   {

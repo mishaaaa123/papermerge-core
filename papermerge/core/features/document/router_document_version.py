@@ -4,7 +4,7 @@ from typing import Annotated
 
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi import APIRouter, HTTPException, Security, Depends, status
+from fastapi import APIRouter, HTTPException, Security, Depends, status, Request
 
 from papermerge.core import schema, utils, dbapi, orm
 from papermerge.core.features.auth import get_current_user
@@ -14,6 +14,10 @@ from papermerge.core.db import common as dbapi_common
 from papermerge.core import exceptions as exc
 from papermerge.core.db.engine import get_db
 from papermerge.core.features.document.response import DocumentFileResponse
+from papermerge.core.rate_limiter import (  # pyright: ignore[reportMissingImports]
+    limiter,
+    DOWNLOAD_RATE_LIMIT,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -41,8 +45,10 @@ router = APIRouter(prefix="/document-versions", tags=["document-versions"])
         }
     }
 )
+@limiter.limit(DOWNLOAD_RATE_LIMIT)
 @utils.docstring_parameter(scope=scopes.DOCUMENT_DOWNLOAD)
 async def download_document_version(
+    request: Request,
     document_version_id: uuid.UUID,
     user: Annotated[
         schema.User, Security(get_current_user, scopes=[scopes.DOCUMENT_DOWNLOAD])
@@ -53,6 +59,12 @@ async def download_document_version(
 
     Required scope: `{scope}`
     """
+    request.state.user_id = str(user.id)
+    logger.info(
+        "Download request received user_id=%s document_version_id=%s",
+        user.id,
+        document_version_id,
+    )
     try:
         doc_id = await dbapi.get_doc_id_from_doc_ver_id(
             db_session, doc_ver_id=document_version_id
@@ -63,6 +75,9 @@ async def download_document_version(
                 codename=scopes.NODE_VIEW,
                 user_id=user.id,
         ):
+            logger.warning(
+                "User %s lacks node.view permission for doc_id=%s", user.id, doc_id
+            )
             raise exc.HTTP403Forbidden()
 
         doc_ver: orm.DocumentVersion = await dbapi.get_doc_ver(
@@ -70,10 +85,21 @@ async def download_document_version(
             document_version_id=document_version_id,
         )
     except NoResultFound:
+        logger.warning(
+            "Document version %s not found for user %s",
+            document_version_id,
+            user.id,
+        )
         error = schema.Error(messages=["Document version not found"])
         raise HTTPException(status_code=404, detail=error.model_dump())
 
     if not doc_ver.file_path.exists():
+        logger.error(
+            "File path %s missing for document_version_id=%s user_id=%s",
+            doc_ver.file_path,
+            document_version_id,
+            user.id,
+        )
         error = schema.Error(messages=["Document version file not found"])
         raise HTTPException(status_code=404, detail=error.model_dump())
 
@@ -92,8 +118,10 @@ async def download_document_version(
         }
     },
 )
+@limiter.limit(DOWNLOAD_RATE_LIMIT)
 @utils.docstring_parameter(scope=scopes.DOCUMENT_DOWNLOAD)
 async def get_doc_ver_download_url(
+    request: Request,
     doc_ver_id: uuid.UUID,
     user: Annotated[schema.User, Security(get_current_user, scopes=[scopes.DOCUMENT_DOWNLOAD])],
     db_session: AsyncSession = Depends(get_db),
@@ -104,6 +132,12 @@ async def get_doc_ver_download_url(
     Required scope: `{scope}`
     For this action user requires "node.view" permission as well.
     """
+    request.state.user_id = str(user.id)
+    logger.info(
+        "Download URL requested user_id=%s document_version_id=%s",
+        user.id,
+        doc_ver_id,
+    )
     try:
         doc_id = await dbapi.get_doc_id_from_doc_ver_id(
             db_session, doc_ver_id=doc_ver_id
@@ -114,6 +148,9 @@ async def get_doc_ver_download_url(
             codename=scopes.NODE_VIEW,
             user_id=user.id,
         ):
+            logger.warning(
+                "User %s lacks node.view permission for doc_id=%s", user.id, doc_id
+            )
             raise exc.HTTP403Forbidden()
 
         result = await dbapi.get_doc_version_download_url(
@@ -121,6 +158,11 @@ async def get_doc_ver_download_url(
             doc_ver_id=doc_ver_id,
         )
     except NoResultFound:
+        logger.warning(
+            "Document version %s not found when generating download URL for user %s",
+            doc_ver_id,
+            user.id,
+        )
         raise exc.HTTP404NotFound()
 
     return result

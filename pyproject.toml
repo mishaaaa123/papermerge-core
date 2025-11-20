@@ -55,7 +55,8 @@ dependencies = [
     "taskipy (>=1.14.1)",
     "asyncpg (>=0.30.0,<0.31.0)",
     "aiofiles (>=24.1.0,<25.0.0)",
-    "psycopg2-binary (>=2.9.11)"
+    "psycopg2-binary (>=2.9.11)",
+    "slowapi (>=0.1.9)"
 ]
 
 [project.urls]

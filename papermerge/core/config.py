@@ -30,6 +30,8 @@ class Settings(BaseSettings):
     #   start schedule OCR on upload; also in this case use can choose to
     #   scheduler OCR later on any document.
     papermerge__ocr__automatic: bool = False
+    papermerge__downloads__max_per_user: int = 1
+    papermerge__downloads__time_window_seconds: int = 60
 
 settings = Settings()
 
