@@ -89,6 +89,22 @@ new_create_user = textwrap.dedent('''
         })
         session.flush()
 
+        # Create ownership records for home and inbox folders
+        session.execute(text("""
+            INSERT INTO ownerships (owner_type, owner_id, resource_type, resource_id)
+            VALUES 
+            ('user', :user_id, 'node', :home_id),
+            ('user', :user_id, 'node', :inbox_id)
+            ON CONFLICT (resource_type, resource_id) DO UPDATE SET
+                owner_type = EXCLUDED.owner_type,
+                owner_id = EXCLUDED.owner_id
+        """), {
+            'user_id': str(user_id),
+            'home_id': str(home_id),
+            'inbox_id': str(inbox_id)
+        })
+        session.flush()
+
         session.execute(text("ALTER TABLE users ENABLE TRIGGER ensure_user_special_folders_after_insert"))
 
         stmt = select(orm.Role).where(orm.Role.name.in_(role_names))
