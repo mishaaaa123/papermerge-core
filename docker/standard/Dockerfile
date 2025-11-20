@@ -1,18 +1,19 @@
 FROM node:25.1 AS frontend_build
 # ensure all packages are up-to-date
-RUN apt update && apt upgrade -y && rm -rf /var/cache/apk/*
+RUN apt update && apt upgrade -y && rm -rf /var/cache/apt/*
 
 WORKDIR /build_frontend_app
 COPY frontend/ .
 
-# Use corepack to manage Yarn version and install dependencies
-RUN corepack enable && \
-    yarn set version 4.9.2 && \
+# Install corepack and use it to manage Yarn version and install dependencies
+RUN npm install -g corepack --force && \
+    corepack enable && \
+    corepack prepare yarn@4.9.2 --activate && \
     yarn install --immutable && \
     yarn workspace ui build
 
 FROM papermerge/auth-server:1.1.5 AS auth_server
-FROM python:3.14.0-alpine AS papermerge_core
+FROM python:3.13.0-alpine AS papermerge_core
 
 ENV CORE_APP=/core_app
 ENV PAPERMERGE__DATABASE__URL=sqlite:////db/db.sqlite3
@@ -43,13 +44,17 @@ RUN pip install --upgrade poetry==2.0.1 roco==0.4.2 && \
 COPY poetry.lock pyproject.toml README.md LICENSE ${CORE_APP}/
 
 WORKDIR ${CORE_APP}
-RUN poetry install --no-root -E pg -vvv
+RUN poetry install --no-root -vvv
 
 COPY docker/standard/entrypoint.sh /entrypoint.sh
 COPY docker/standard/bundles/supervisor/* docker/standard/logging.yaml /etc/papermerge/
 COPY docker/standard/bundles/nginx/* /etc/nginx/
 COPY docker/standard/core.js.tmpl alembic.ini ${CORE_APP}/
 COPY ./papermerge ${CORE_APP}/papermerge/
+
+# Install the package in editable mode
+WORKDIR ${CORE_APP}
+RUN poetry install -vvv
 
 COPY docker/standard/scripts/ /usr/bin/
 # Set execute permissions
@@ -63,9 +68,8 @@ COPY --from=auth_server /usr/share/nginx/html/ /usr/share/nginx/html/auth_server
 # Copy frontend build artifacts
 COPY --from=frontend_build /build_frontend_app/apps/ui/dist/ /usr/share/nginx/html/ui
 
-# Install dependencies for auth server and core app
-RUN cd /auth_server_app/ && poetry install -E pg
-RUN cd /core_app/ && poetry install -E pg -E cloud
+# Install dependencies for auth server
+RUN cd /auth_server_app/ && poetry install && poetry add psycopg2-binary
 
 EXPOSE 80
 

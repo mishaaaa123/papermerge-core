@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  webapp:
+    build:
+      context: .
+      dockerfile: docker/standard/Dockerfile
+    environment:
+      PAPERMERGE__SECURITY__SECRET_KEY: "jef_1jIuxIKZb45aM3gfWQAmaOYBEbn2nMF0RZk73xcVEiTIIPwUv-6mz8QFMDCzQ8E"
+      PAPERMERGE__AUTH__USERNAME: admin
+      PAPERMERGE__AUTH__PASSWORD: 1234
+      PAPERMERGE__DATABASE__URL: postgresql://papermerge:papermerge@db:5432/pmgdb
+      PAPERMERGE__MAIN__MEDIA_ROOT: /var/media/pmg
+      PAPERMERGE__REDIS__URL: redis://default:azO75KhM00g1w9uCQDzSWgdTLPt7EXC0@redis-12639.crce206.ap-south-1-1.ec2.cloud.redislabs.com:12639
+      PAPERMERGE__MAIN__FILE_SERVER: local
+      PAPERMERGE__DOWNLOADS__MAX_PER_USER: "1"
+      PAPERMERGE__DOWNLOADS__TIME_WINDOW_SECONDS: "60"
+    ports:
+      - "8080:80"
+    volumes:
+      - media_root:/var/media/pmg
+    depends_on:
+      - db
+
+  path_template_worker:
+    image: papermerge/path-tmpl-worker:0.4
+    command: worker
+    environment:
+      PAPERMERGE__DATABASE__URL: postgresql://papermerge:papermerge@db:5432/pmgdb
+      PAPERMERGE__REDIS__URL: redis://default:azO75KhM00g1w9uCQDzSWgdTLPt7EXC0@redis-12639.crce206.ap-south-1-1.ec2.cloud.redislabs.com:12639
+      PATH_TMPL_WORKER_ARGS: "-Q path_tmpl -c 2"
+    depends_on:
+      - db
+
+  db:
+    image: postgres:16.1
+    environment:
+      POSTGRES_DB: pmgdb
+      POSTGRES_USER: papermerge
+      POSTGRES_PASSWORD: papermerge
+    volumes:
+      - pgdata:/var/lib/postgresql/data/
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  media_root:
+  pgdata:
+
