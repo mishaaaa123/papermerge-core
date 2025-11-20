@@ -84,6 +84,10 @@ case $CMD in
     ;;
   server)
     exec_init
+    # Fix auth server ORM model to remove home_folder_id and inbox_folder_id
+    /usr/bin/fix_auth_server_orm.sh
+    # Fix auth server API to remove home_folder_id/inbox_folder_id usage and fix folder creation
+    /usr/bin/fix_auth_server_api.sh
     # TODO: replace roco with env2js
     roco > /usr/share/nginx/html/auth_server/papermerge-runtime-config.js
     # Once user options endpoint is implemented, following two lines will removed
@@ -92,6 +96,10 @@ case $CMD in
     exec /usr/bin/supervisord -c /etc/papermerge/supervisord.conf
     ;;
   server_without_init)
+    # Fix auth server ORM model to remove home_folder_id and inbox_folder_id
+    /usr/bin/fix_auth_server_orm.sh
+    # Fix auth server API to remove home_folder_id/inbox_folder_id usage and fix folder creation
+    /usr/bin/fix_auth_server_api.sh
     # TODO: replace roco with env2js
     roco > /usr/share/nginx/html/auth_server/papermerge-runtime-config.js
     # Once user options endpoint is implemented, following two lines will removed
