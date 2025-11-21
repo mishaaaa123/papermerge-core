@@ -1,7 +1,8 @@
+import logging
 import uuid
 from typing import Annotated, Union
 
-from fastapi import APIRouter, Security, Depends, Response, status
+from fastapi import APIRouter, Security, Depends, Response, status, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from papermerge.core.db.engine import get_db
@@ -10,6 +11,8 @@ from papermerge.core.routers.params import CommonQueryParams
 from papermerge.core.features.auth import scopes, get_current_user
 from papermerge.core.types import PaginatedResponse
 from papermerge.core.features.nodes.db import api as nodes_api
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/shared-nodes",
@@ -41,6 +44,15 @@ async def get_shared_nodes(
         filter=params.filter,
         user_id=user.id,
     )
+
+    logger.info(
+        "get_shared_nodes: user_id=%s, total_items=%d, page_number=%d, page_size=%d",
+        user.id,
+        nodes.total_items,
+        nodes.page_number,
+        nodes.page_size,
+    )
+    logger.debug("get_shared_nodes: items=%s", [item.id for item in nodes.items])
 
     return nodes
 
@@ -88,8 +100,16 @@ async def create_shared_nodes(
 
     Required scope: `{scope}`
     """
+    logger.info(
+        "Creating shared nodes: owner_id=%s, node_ids=%s, user_ids=%s, group_ids=%s, role_ids=%s",
+        user.id,
+        shared_node.node_ids,
+        shared_node.user_ids,
+        shared_node.group_ids,
+        shared_node.role_ids,
+    )
 
-    await dbapi.create_shared_nodes(
+    result, error = await dbapi.create_shared_nodes(
         db_session=db_session,
         node_ids=shared_node.node_ids,
         role_ids=shared_node.role_ids,
@@ -97,6 +117,12 @@ async def create_shared_nodes(
         group_ids=shared_node.group_ids,
         owner_id=user.id,
     )
+
+    if error:
+        logger.error("Error creating shared nodes: %s", error)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=error)
+    else:
+        logger.info("Successfully created %d shared node(s)", len(result) if result else 0)
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

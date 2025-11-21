@@ -2,7 +2,8 @@ import {useGetGroupsQuery} from "@/features/groups/storage/api"
 import {useGetRolesQuery} from "@/features/roles/storage/api"
 import {useAddNewSharedNodeMutation} from "@/features/shared_nodes/store/apiSlice"
 import {useGetUsersQuery} from "@/features/users/storage/api"
-import {Button, Container, Group, Loader, Modal} from "@mantine/core"
+import {Button, Container, Group, Loader, Modal, Text} from "@mantine/core"
+import {notifications} from "@mantine/notifications"
 import {useState} from "react"
 import SelectGroups from "./SelectGroups"
 import SelectRoles from "./SelectRoles"
@@ -48,6 +49,26 @@ export const ShareNodesModal = ({
     const role_ids =
       dataRoles?.filter(r => roles?.includes(r.name)).map(r => r.id) || []
 
+    // Validate that at least one user or group is selected
+    if (user_ids.length === 0 && group_ids.length === 0) {
+      notifications.show({
+        color: "red",
+        title: "Validation Error",
+        message: "Please select at least one user or group to share with."
+      })
+      return
+    }
+
+    // Validate that at least one role is selected
+    if (role_ids.length === 0) {
+      notifications.show({
+        color: "red",
+        title: "Validation Error",
+        message: "Please select at least one role to grant."
+      })
+      return
+    }
+
     const newSharedNodeData = {
       user_ids,
       group_ids,
@@ -56,10 +77,21 @@ export const ShareNodesModal = ({
     }
     try {
       await addNewSharedNode(newSharedNodeData).unwrap()
-    } catch (err) {}
-
-    onSubmit()
-    reset()
+      notifications.show({
+        color: "green",
+        title: "Success",
+        message: "Document(s) shared successfully."
+      })
+      onSubmit()
+      reset()
+    } catch (err: any) {
+      const errorMessage = err?.data?.detail || err?.message || "Failed to share document(s). Please try again."
+      notifications.show({
+        color: "red",
+        title: "Error",
+        message: errorMessage
+      })
+    }
   }
 
   const localCancel = () => {

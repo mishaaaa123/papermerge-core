@@ -1,9 +1,10 @@
 import uuid
 import math
+import logging
 from typing import Union, Tuple, Sequence
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_, func, delete, tuple_
+from sqlalchemy import select, or_, and_, func, delete, tuple_
 from sqlalchemy.orm import aliased, selectin_polymorphic, selectinload
 
 from papermerge.core.features.shared_nodes import schema as sn_schema
@@ -11,6 +12,8 @@ from papermerge.core.features.shared_nodes.db import orm as sn_orm
 from papermerge.core.types import PaginatedResponse
 from papermerge.core import orm, schema, dbapi
 from papermerge.core.db import common as dbapi_common
+
+logger = logging.getLogger(__name__)
 
 
 def str2colexpr(keys: list[str]):
@@ -41,11 +44,27 @@ async def create_shared_nodes(
     user_ids: list[uuid.UUID] | None = None,
     group_ids: list[uuid.UUID] | None = None,
 ) -> Tuple[list[sn_schema.SharedNode] | None, str | None]:
+    
     if user_ids is None:
         user_ids = []
 
     if group_ids is None:
         group_ids = []
+
+    if not node_ids:
+        error = "node_ids cannot be empty"
+        logger.warning("create_shared_nodes: %s", error)
+        return None, error
+
+    if not role_ids:
+        error = "role_ids cannot be empty"
+        logger.warning("create_shared_nodes: %s", error)
+        return None, error
+
+    if not user_ids and not group_ids:
+        error = "At least one of user_ids or group_ids must be provided"
+        logger.warning("create_shared_nodes: %s", error)
+        return None, error
 
     shared_nodes = []
     for node_id in node_ids:
@@ -72,8 +91,15 @@ async def create_shared_nodes(
                     )
                 )
 
+    if not shared_nodes:
+        error = "No shared nodes created - check that user_ids/group_ids and role_ids are not empty"
+        logger.warning("create_shared_nodes: %s", error)
+        return None, error
+
+    logger.info("Creating %d shared node(s)", len(shared_nodes))
     db_session.add_all(shared_nodes)
     await db_session.commit()
+    logger.info("Successfully created %d shared node(s)", len(shared_nodes))
 
     return shared_nodes, None
 
@@ -149,15 +175,22 @@ async def get_paginated_shared_nodes(
 
     items = []
 
-    for row in await db_session.execute(paginated_stmt):
-        if row.Node.ctype == "folder":
-            new_item = schema.Folder.model_validate(row.Node)
+    nodes = (await db_session.scalars(paginated_stmt)).all()
+    logger.info("get_paginated_shared_nodes: Found %d nodes for user_id=%s", len(nodes), user_id)
+    
+    for node in nodes:
+        logger.debug("Processing shared node: id=%s, title=%s, ctype=%s", node.id, node.title, node.ctype)
+        if node.ctype == "folder":
+            new_item = schema.Folder.model_validate(node)
         else:
-            doc = await dbapi.load_doc(db_session, row.Node.id)
+            doc = await dbapi.load_doc(db_session, node.id)
             new_item = schema.Document.model_validate(doc)
 
-        new_item.perms = perms[row.Node.id]
+        new_item.perms = perms.get(node.id, [])
+        logger.debug("Node %s has permissions: %s", node.id, new_item.perms)
         items.append(new_item)
+    
+    logger.info("get_paginated_shared_nodes: Returning %d items", len(items))
 
     return PaginatedResponse[Union[schema.Document, schema.Folder]](
         page_size=page_size,

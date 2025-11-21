@@ -140,13 +140,13 @@ with open(schema_path, "r") as f:
     schema_content = f.read()
 
 schema_content, count1 = re.subn(
-    r"home_folder_id:\s*UUID",
+    r"home_folder_id:\s*UUID(?!\s*\|)",
     "home_folder_id: UUID | None = None",
     schema_content,
     count=1,
 )
 schema_content, count2 = re.subn(
-    r"inbox_folder_id:\s*UUID",
+    r"inbox_folder_id:\s*UUID(?!\s*\|)",
     "inbox_folder_id: UUID | None = None",
     schema_content,
     count=1,

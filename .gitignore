@@ -7,7 +7,7 @@
 .pnp.*
 
 # env vars
-
+.env
 .envok.yaml
 
 *.pid

@@ -11,7 +11,7 @@ services:
       PAPERMERGE__AUTH__PASSWORD: 1234
       PAPERMERGE__DATABASE__URL: postgresql://papermerge:papermerge@db:5432/pmgdb
       PAPERMERGE__MAIN__MEDIA_ROOT: /var/media/pmg
-      PAPERMERGE__REDIS__URL: redis://default:azO75KhM00g1w9uCQDzSWgdTLPt7EXC0@redis-12639.crce206.ap-south-1-1.ec2.cloud.redislabs.com:12639
+      PAPERMERGE__REDIS__URL: ${PAPERMERGE__REDIS__URL:-}
       PAPERMERGE__MAIN__FILE_SERVER: local
       PAPERMERGE__DOWNLOADS__MAX_PER_USER: "1"
       PAPERMERGE__DOWNLOADS__TIME_WINDOW_SECONDS: "60"
@@ -27,7 +27,7 @@ services:
     command: worker
     environment:
       PAPERMERGE__DATABASE__URL: postgresql://papermerge:papermerge@db:5432/pmgdb
-      PAPERMERGE__REDIS__URL: redis://default:azO75KhM00g1w9uCQDzSWgdTLPt7EXC0@redis-12639.crce206.ap-south-1-1.ec2.cloud.redislabs.com:12639
+      PAPERMERGE__REDIS__URL: ${PAPERMERGE__REDIS__URL:-}
       PATH_TMPL_WORKER_ARGS: "-Q path_tmpl -c 2"
     depends_on:
       - db
