@@ -36,6 +36,8 @@ import {skipToken} from "@reduxjs/toolkit/query"
 import FolderNodeActions from "./FolderNodeActions"
 
 export default function SharedCommander() {
+  console.log("SharedCommander: Component rendered!")
+  
   const mode: PanelMode = useContext(PanelContext)
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
@@ -43,21 +45,31 @@ export default function SharedCommander() {
   const currentNodeID = useAppSelector(selectCurrentSharedNodeID)
   const currentSharedRootID = useAppSelector(selectCurrentSharedRootID)
 
-  const [pageSize, setPageSize] = useState<number>(lastPageSize)
+  console.log("SharedCommander: mode =", mode)
+  console.log("SharedCommander: currentNodeID =", currentNodeID)
+  console.log("SharedCommander: lastPageSize =", lastPageSize)
+
+  const [pageSize, setPageSize] = useState<number>(lastPageSize || 25)
   const [page, setPage] = useState<number>(1)
   const filter = useAppSelector(s => selectFilterText(s, mode))
   const sortDir = useAppSelector(s => selectCommanderSortMenuDir(s, mode))
   const sortColumn = useAppSelector(s => selectCommanderSortMenuColumn(s, mode))
 
-  const {data, isLoading, isFetching, isError} =
-    useGetPaginatedSharedNodesQuery({
-      nodeID: currentNodeID || SHARED_FOLDER_ROOT_ID,
-      page_number: page,
-      page_size: pageSize,
-      filter: filter,
-      sortDir: sortDir,
-      sortColumn: sortColumn
-    })
+  const queryParams = {
+    nodeID: currentNodeID || SHARED_FOLDER_ROOT_ID,
+    page_number: page,
+    page_size: pageSize,
+    filter: filter || undefined,
+    sortDir: sortDir || "az",
+    sortColumn: sortColumn || "title"
+  }
+
+  console.log("SharedCommander: queryParams =", queryParams)
+
+  const {data, isLoading, isFetching, isError, error} =
+    useGetPaginatedSharedNodesQuery(queryParams)
+
+  console.log("SharedCommander: query state - isLoading =", isLoading, "isFetching =", isFetching, "isError =", isError, "error =", error)
 
   const skipFolderQuery =
     currentNodeID == SHARED_FOLDER_ROOT_ID || !currentNodeID

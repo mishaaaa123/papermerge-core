@@ -133,16 +133,36 @@ async def get_paginated_shared_nodes(
         )
     )
 
+    # Subquery to find all node_ids that are shared with this user
+    shared_node_ids_subquery = (
+        select(orm.SharedNode.node_id)
+        .where(
+            or_(
+                orm.SharedNode.user_id == user_id,
+                orm.SharedNode.group_id.in_(subquery),
+            )
+        )
+    )
+    
+    # Show shared nodes that are either:
+    # 1. Top-level (parent_id IS NULL), OR
+    # 2. Nested but their parent is NOT shared (so we can show nested documents without sharing parent folders)
     base_stmt = (
         select(orm.Node)
         .select_from(orm.SharedNode)
         .options(selectinload(orm.Node.tags))
         .join(orm.Node, orm.Node.id == orm.SharedNode.node_id)
         .where(
-            or_(
-                orm.SharedNode.user_id == user_id,
-                orm.SharedNode.group_id.in_(subquery),
+            and_(
+                or_(
+                    orm.SharedNode.user_id == user_id,
+                    orm.SharedNode.group_id.in_(subquery),
+                ),
+                or_(
+                    orm.Node.parent_id.is_(None),  # Top-level nodes
+                    ~orm.Node.parent_id.in_(shared_node_ids_subquery)  # Nested nodes whose parent is NOT shared
                 )
+            )
         )
     )
 

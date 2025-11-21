@@ -46,11 +46,12 @@ async def get_shared_nodes(
     )
 
     logger.info(
-        "get_shared_nodes: user_id=%s, total_items=%d, page_number=%d, page_size=%d",
+        "get_shared_nodes: user_id=%s, num_pages=%d, page_number=%d, page_size=%d, items_count=%d",
         user.id,
-        nodes.total_items,
+        nodes.num_pages,
         nodes.page_number,
         nodes.page_size,
+        len(nodes.items),
     )
     logger.debug("get_shared_nodes: items=%s", [item.id for item in nodes.items])
 
