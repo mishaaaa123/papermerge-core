@@ -56,9 +56,9 @@ export default function SharedCommander() {
   const sortColumn = useAppSelector(s => selectCommanderSortMenuColumn(s, mode))
 
   const queryParams = {
-    nodeID: currentNodeID || SHARED_FOLDER_ROOT_ID,
-    page_number: page,
-    page_size: pageSize,
+      nodeID: currentNodeID || SHARED_FOLDER_ROOT_ID,
+      page_number: page,
+      page_size: pageSize,
     filter: filter || undefined,
     sortDir: sortDir || "az",
     sortColumn: sortColumn || "title"

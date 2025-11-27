@@ -154,15 +154,15 @@ async def get_paginated_shared_nodes(
         .join(orm.Node, orm.Node.id == orm.SharedNode.node_id)
         .where(
             and_(
-                or_(
-                    orm.SharedNode.user_id == user_id,
-                    orm.SharedNode.group_id.in_(subquery),
+            or_(
+                orm.SharedNode.user_id == user_id,
+                orm.SharedNode.group_id.in_(subquery),
                 ),
                 or_(
                     orm.Node.parent_id.is_(None),  # Top-level nodes
                     ~orm.Node.parent_id.in_(shared_node_ids_subquery)  # Nested nodes whose parent is NOT shared
                 )
-            )
+                )
         )
     )
 
