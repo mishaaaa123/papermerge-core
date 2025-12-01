@@ -5,6 +5,7 @@ import {
   Skeleton,
   Stack,
   TagsInput,
+  Text,
   TextInput
 } from "@mantine/core"
 import {useDisclosure} from "@mantine/hooks"
@@ -29,6 +30,24 @@ import {
 import type {ClientDocumentVersion, PanelMode} from "@/types"
 import DocumentDetailsToggle from "../DocumentDetailsToggle"
 import CustomFields from "./CustomFields"
+
+function formatDuration(totalSeconds: number): string {
+  if (!Number.isFinite(totalSeconds) || totalSeconds < 0) {
+    return ""
+  }
+  const seconds = Math.floor(totalSeconds)
+  const h = Math.floor(seconds / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
+  const s = seconds % 60
+
+  const parts = []
+  if (h > 0) {
+    parts.push(h.toString().padStart(2, "0"))
+  }
+  parts.push(m.toString().padStart(2, "0"))
+  parts.push(s.toString().padStart(2, "0"))
+  return parts.join(":")
+}
 
 interface Args {
   doc?: DocumentType
@@ -106,6 +125,23 @@ export default function DocumentDetails({doc, docVer, docID, isLoading}: Args) {
             value={ocrLang}
             mt="md"
           />
+          {docVer?.video_duration != null && (
+            <Text mt="md">
+              {t("common.duration")}: {formatDuration(docVer.video_duration)}
+            </Text>
+          )}
+          {docVer?.video_width != null &&
+            docVer.video_height != null && (
+              <Text>
+                {t("common.resolution")}: {docVer.video_width}×
+                {docVer.video_height}
+              </Text>
+            )}
+          {docVer?.video_codec && (
+            <Text>
+              {t("common.codec")}: {docVer.video_codec}
+            </Text>
+          )}
         </Stack>
       </div>
     )

@@ -43,6 +43,7 @@ import DeleteEntireDocumentConfirm from "./DeleteEntireDocumentConfirm"
 import PagesHaveChangedDialog from "./PageHaveChangedDialog"
 import PageList from "./PageList"
 import ThumbnailList from "./ThumbnailList"
+import VideoPlayer from "./VideoPlayer/VideoPlayer"
 
 export default function ViewerContainer() {
   const {doc} = useCurrentDoc()
@@ -56,6 +57,16 @@ interface Args {
   docVer: ReturnType<typeof useCurrentDocVer>["docVer"]
 }
 
+const VIDEO_EXTENSIONS = ["mp4", "webm", "mov", "avi"]
+
+function isVideoFileName(fileName?: string | null): boolean {
+  if (!fileName) return false
+  const parts = fileName.split(".")
+  if (parts.length < 2) return false
+  const ext = parts[parts.length - 1].toLowerCase()
+  return VIDEO_EXTENSIONS.includes(ext)
+}
+
 export function Viewer({doc, docVer}: Args) {
   const user = useAppSelector(selectCurrentUser)
 
@@ -63,13 +74,15 @@ export function Viewer({doc, docVer}: Args) {
   const mode: PanelMode = useContext(PanelContext)
   const navigate = useNavigate()
   const dispatch = useAppDispatch()
-  /* generate first batch of previews: for pages and for their thumbnails */
-  const allPreviewsAreAvailable = useGeneratePreviews({
+  const isVideoDoc = isVideoFileName(docVer?.file_name)
+  // Always call the hook to respect React's rules of hooks; for videos we simply ignore its result.
+  const previewsReady = useGeneratePreviews({
     docVer: docVer,
     pageNumber: 1,
     pageSize: DOC_VER_PAGINATION_PAGE_BATCH_SIZE,
     imageSize: "md"
   })
+  const allPreviewsAreAvailable = isVideoDoc ? true : previewsReady
   const selectedPages = useSelectedPages({mode, docVerID: docVer?.id})
 
   const {
@@ -195,6 +208,57 @@ export function Viewer({doc, docVer}: Args) {
 
   if (!allPreviewsAreAvailable) {
     return <Loader />
+  }
+
+  // Special case: video documents are rendered with a video player instead of page previews
+  if (isVideoDoc) {
+    return (
+      <div ref={ref} style={{height: "100%"}}>
+        <ActionButtons
+          onEditNodeTitleClicked={onEditNodeTitleItem}
+          onRotateCWClicked={onRotateCWItemClicked}
+          onRotateCCClicked={onRotateCCItemClicked}
+          onDeletePagesClicked={onDeletePagesItemClicked}
+        />
+        <Group justify="space-between">
+          <Breadcrumbs breadcrumb={doc?.breadcrumb} onClick={onClick} />
+          <DocumentDetailsToggle />
+        </Group>
+        <Flex className={classes.inner} style={{height: "100%"}}>
+          {/* No thumbnails list for now for videos */}
+          <VideoPlayer docId={doc.id} fileName={docVer.file_name} />
+          <DocumentDetails
+            docVer={docVer}
+            doc={doc}
+            docID={doc?.id}
+            isLoading={false}
+          />
+          <PagesHaveChangedDialog docID={doc.id} />
+          <ContextMenu
+            opened={opened}
+            position={position}
+            onEditNodeTitleItemClicked={onEditNodeTitleItem}
+            onRotateCCItemClicked={onRotateCCItemClicked}
+            onRotateCWItemClicked={onRotateCWItemClicked}
+            onResetChangesItemClicked={onResetChangesItemClicked}
+            onSaveChangesItemClicked={onSaveChangesItemClicked}
+            onDeletePagesItemClicked={onDeletePagesItemClicked}
+            onDeleteDocumentItemClicked={onDeleteDocumentItemClicked}
+          />
+        </Flex>
+        <EditNodeTitleModal
+          opened={openedEditNodeTitleModal}
+          node={{id: doc?.id!, title: doc?.title!}}
+          onSubmit={closeEditNodeTitleModal}
+          onCancel={closeEditNodeTitleModal}
+        />
+        <DeleteEntireDocumentConfirm
+          opened={openedDeleteEntireDocumentConfirm}
+          onCancel={onDeleteEntireDocumentConfirmCancel}
+          onSubmit={onDeleteEntireDocumentConfirmSubmit}
+        />
+      </div>
+    )
   }
 
   return (

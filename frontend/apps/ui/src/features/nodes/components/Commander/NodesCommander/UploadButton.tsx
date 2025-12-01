@@ -17,7 +17,9 @@ import {useTranslation} from "react-i18next"
 import {DropFilesModal} from "./DropFiles"
 import SupportedFilesInfoModal from "./SupportedFilesInfoModal"
 
-const MIME_TYPES = [...SUPPORTED_EXTENSIONS, ...SUPPORTED_MIME_TYPES].join(",")
+// Combine MIME types and extensions for the accept attribute
+// The accept attribute supports both formats: MIME types (video/mp4) and extensions (.mp4)
+const ACCEPT_STRING = [...SUPPORTED_MIME_TYPES, ...SUPPORTED_EXTENSIONS].join(",")
 
 export default function UploadButton() {
   const {t} = useTranslation()
@@ -56,7 +58,7 @@ export default function UploadButton() {
 
   return (
     <>
-      <FileButton onChange={onUpload} accept={MIME_TYPES} multiple>
+      <FileButton onChange={onUpload} accept={ACCEPT_STRING} multiple>
         {props => (
           <Tooltip label={t("common.upload")} withArrow>
             <ActionIcon {...props} size="lg" variant="default">

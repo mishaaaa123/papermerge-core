@@ -5,6 +5,8 @@ import os
 from os.path import getsize
 import uuid
 import tempfile
+import subprocess
+import json
 from pathlib import Path
 from typing import Tuple, Sequence, Any, Optional, Dict
 
@@ -759,6 +761,13 @@ class FileType:
     JPEG = "jpeg"
     PNG = "png"
     TIFF = "tiff"
+    GIF = "gif"
+    WEBP = "webp"
+    BMP = "bmp"
+    MP4 = "mp4"
+    WEBM = "webm"
+    QUICKTIME = "quicktime"
+    AVI = "x-msvideo"
 
 
 def file_type(content_type: str) -> str:
@@ -767,6 +776,30 @@ def file_type(content_type: str) -> str:
         return parts[1]
 
     raise ValueError(f"Invalid content type {content_type}")
+
+
+def is_video(content_type: str) -> bool:
+    """Check if content type is a video"""
+    video_types = [
+        constants.ContentType.VIDEO_MP4,
+        constants.ContentType.VIDEO_WEBM,
+        constants.ContentType.VIDEO_QUICKTIME,
+        constants.ContentType.VIDEO_AVI,
+    ]
+    return content_type in video_types
+
+
+def is_image(content_type: str) -> bool:
+    """Check if content type is an image (excluding PDF)"""
+    image_types = [
+        constants.ContentType.IMAGE_JPEG,
+        constants.ContentType.IMAGE_PNG,
+        constants.ContentType.IMAGE_TIFF,
+        constants.ContentType.IMAGE_GIF,
+        constants.ContentType.IMAGE_WEBP,
+        constants.ContentType.IMAGE_BMP,
+    ]
+    return content_type in image_types
 
 
 def get_pdf_page_count(content: io.BytesIO | bytes) -> int:
@@ -817,6 +850,92 @@ async def create_next_version(
     return document_version
 
 
+def extract_video_metadata(file_path: Path) -> tuple[int | None, int | None, int | None, str | None]:
+    """
+    Extract basic video metadata (duration, width, height, codec) using ffprobe.
+
+    Returns a tuple (duration_seconds, width, height, codec_name). Any element
+    may be None if extraction fails or data is missing.
+    """
+    cmd = [
+        "ffprobe",
+        "-v",
+        "error",
+        "-select_streams",
+        "v:0",
+        "-show_entries",
+        "stream=width,height,codec_name",
+        "-show_entries",
+        "format=duration",
+        "-of",
+        "json",
+        str(file_path),
+    ]
+
+    try:
+        completed = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True,
+            text=True,
+        )
+    except FileNotFoundError:
+        logger.error("ffprobe binary not found while extracting metadata for %s", file_path)
+        return None, None, None, None
+    except subprocess.CalledProcessError as e:
+        logger.error(
+            "ffprobe failed extracting metadata for %s: %s",
+            file_path,
+            e.stderr,
+        )
+        return None, None, None, None
+
+    try:
+        data = json.loads(completed.stdout)
+    except json.JSONDecodeError as e:
+        logger.error(
+            "Failed to parse ffprobe JSON output for %s: %s",
+            file_path,
+            str(e),
+        )
+        return None, None, None, None
+
+    duration_sec: int | None = None
+    width: int | None = None
+    height: int | None = None
+    codec_name: str | None = None
+
+    # Duration is in format.duration as a string
+    fmt = data.get("format") or {}
+    duration_str = fmt.get("duration")
+    if duration_str:
+        try:
+            duration_float = float(duration_str)
+            duration_sec = int(duration_float)
+        except (TypeError, ValueError):
+            logger.warning(
+                "Unexpected duration value from ffprobe for %s: %r",
+                file_path,
+                duration_str,
+            )
+
+    streams = data.get("streams") or []
+    if streams:
+        v0 = streams[0]
+        width_val = v0.get("width")
+        height_val = v0.get("height")
+        codec_val = v0.get("codec_name")
+        if isinstance(width_val, int):
+            width = width_val
+        if isinstance(height_val, int):
+            height = height_val
+        if isinstance(codec_val, str):
+            codec_name = codec_val
+
+    return duration_sec, width, height, codec_name
+
+
 async def upload(
     db_session: AsyncSession,
     document_id: uuid.UUID,
@@ -829,7 +948,44 @@ async def upload(
     doc = await db_session.get(orm.Document, document_id)
     orig_ver = None
 
-    if content_type != constants.ContentType.APPLICATION_PDF:
+    # Handle videos: store as-is, no PDF conversion
+    if content_type and is_video(content_type):
+        video_ver = await create_next_version(
+            db_session, doc=doc, file_name=file_name, file_size=size
+        )
+        dst_path = abs_docver_path(video_ver.id, video_ver.file_name)
+        await copy_file(src=content, dst=dst_path)
+
+        # Videos don't have pages in the traditional sense, but we set page_count to 1
+        # for consistency with the data model
+        video_ver.page_count = 1
+
+        # Extract basic video metadata
+        duration, width, height, codec_name = extract_video_metadata(dst_path)
+        video_ver.video_duration = duration
+        video_ver.video_width = width
+        video_ver.video_height = height
+        video_ver.video_codec = codec_name
+
+        # Create a single page entry for the video
+        db_page_video = orm.Page(
+            number=1,
+            page_count=1,
+            lang=video_ver.lang,
+            document_version_id=video_ver.id,
+        )
+        db_session.add(db_page_video)
+        db_session.add(video_ver)
+
+        # Set pdf_ver for consistency with the rest of the code
+        pdf_ver = video_ver
+        
+    elif content_type != constants.ContentType.APPLICATION_PDF:
+        # Handle images: convert to PDF
+        if not is_image(content_type):
+            error = schema.Error(messages=[f"Unsupported file type: {content_type}"])
+            return None, error
+            
         try:
             with tempfile.TemporaryDirectory() as tmpdirname:
                 tmp_file_path = Path(tmpdirname) / f"{file_name}.pdf"
@@ -920,14 +1076,16 @@ async def upload(
             route_name="s3",
         )
 
-    # PDF document
+    # PDF document (or video/document that doesn't need PDF conversion)
     tasks.send_task(
         constants.S3_WORKER_ADD_DOC_VER,
         kwargs={"doc_ver_ids": [str(pdf_ver.id)]},
         route_name="s3",
     )
 
-    if not settings.papermerge__ocr__automatic:
+    # Skip OCR for videos - they don't have text content to extract
+    is_video_file = content_type and is_video(content_type)
+    if not is_video_file and not settings.papermerge__ocr__automatic:
         if doc.ocr is True:
             # user chose "schedule OCR" when uploading document
             tasks.send_task(

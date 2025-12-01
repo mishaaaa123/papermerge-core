@@ -236,6 +236,11 @@ class DocumentVersion(BaseModel):
     page_count: int = 0
     short_description: str | None = None
     document_id: UUID
+    # Optional video metadata (only populated for video documents)
+    video_duration: int | None = None  # seconds
+    video_width: int | None = None
+    video_height: int | None = None
+    video_codec: str | None = None
     download_url: DownloadUrl = None
     pages: list[BasicPage] | None = Field(default_factory=list)
 

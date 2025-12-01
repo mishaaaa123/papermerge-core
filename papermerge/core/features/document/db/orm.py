@@ -74,6 +74,11 @@ class DocumentVersion(Base, AuditColumns):
     text: Mapped[str] = mapped_column(nullable=True)
 
     page_count: Mapped[int] = mapped_column(default=0)
+    # Optional video metadata (only populated for video documents)
+    video_duration: Mapped[int] = mapped_column(nullable=True)  # seconds
+    video_width: Mapped[int] = mapped_column(nullable=True)
+    video_height: Mapped[int] = mapped_column(nullable=True)
+    video_codec: Mapped[str] = mapped_column(nullable=True)
     short_description: Mapped[str] = mapped_column(nullable=True)
     pages: Mapped[list["Page"]] = relationship(
         back_populates="document_version", lazy="select"

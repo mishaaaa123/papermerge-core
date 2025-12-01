@@ -395,6 +395,11 @@ export interface ClientDocumentVersion {
   document_id: string
   short_description: string
   size: number
+  // Optional video metadata (populated only for video documents)
+  video_duration?: number | null
+  video_width?: number | null
+  video_height?: number | null
+  video_codec?: string | null
   pages: Array<ClientPage>
   pagination: Pagination
   thumbnailsPagination: Pagination

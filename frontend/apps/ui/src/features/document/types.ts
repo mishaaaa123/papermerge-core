@@ -58,6 +58,11 @@ export type DocumentVersion = {
   pages: Array<BasicPageType>
   short_description: string
   size: number
+  // Optional video metadata (only for video documents)
+  video_duration?: number | null
+  video_width?: number | null
+  video_height?: number | null
+  video_codec?: string | null
 }
 
 export type NodeTag = {

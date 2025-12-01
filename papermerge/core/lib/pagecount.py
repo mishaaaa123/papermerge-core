@@ -74,7 +74,7 @@ def get_pagecount(filepath: str) -> int:
     """
     Returns the number of pages in a file given by filepath.
 
-    filepath - is filesystem path to a PDF/JPEG/PNG/TIFF document
+    filepath - is filesystem path to a PDF/JPEG/PNG/TIFF/Video document
     """
     if not os.path.isfile(filepath):
         raise ValueError("Filepath %s is not a file" % filepath)
@@ -84,10 +84,10 @@ def get_pagecount(filepath: str) -> int:
 
     base, ext = os.path.splitext(filepath)
     mime_type = from_file(filepath, mime=True)
-    # pure images (png, jpeg) have only one page :)
+    # pure images (png, jpeg, gif, webp, bmp) have only one page :)
 
-    if mime_type in ['image/png', 'image/jpeg', 'image/jpg']:
-        # whatever png/jpg image is there - it is
+    if mime_type in ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp', 'image/bmp']:
+        # whatever image is there - it is
         # considered by default one page document.
         return 1
 
@@ -95,7 +95,7 @@ def get_pagecount(filepath: str) -> int:
     # django saves temporary file as application/octet-stream
     # Checking extentions is an extra method of finding out correct
     # mime type
-    if ext and ext.lower() in ('.jpeg', '.png', '.jpg'):
+    if ext and ext.lower() in ('.jpeg', '.png', '.jpg', '.gif', '.webp', '.bmp'):
         return 1
 
     if mime_type == 'image/tiff':
@@ -108,6 +108,16 @@ def get_pagecount(filepath: str) -> int:
     if ext and ext.lower() in ('.tiff', ):
         return _get_tiff_pagecount(filepath)
 
+    # Videos don't have pages, but we return 1 for consistency with the data model
+    if mime_type in ['video/mp4', 'video/webm', 'video/quicktime', 'video/x-msvideo']:
+        return 1
+
+    # In case of REST API upload (via PUT + form multipart)
+    # Checking extentions is an extra method of finding out correct
+    # mime type
+    if ext and ext.lower() in ('.mp4', '.webm', '.mov', '.avi'):
+        return 1
+
     if mime_type != 'application/pdf':
         # In case of REST API upload (via PUT + form multipart)
         # django saves temporary file as application/octet-stream
@@ -115,7 +125,7 @@ def get_pagecount(filepath: str) -> int:
         # mime type
         if ext and ext.lower() != '.pdf':
             raise FileTypeNotSupported(
-                "Only jpeg, png, pdf and tiff are handled by this"
+                "Only jpeg, png, pdf, tiff, gif, webp, bmp, and video files (mp4, webm, mov, avi) are handled by this"
                 " method"
             )
 

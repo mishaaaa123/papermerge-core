@@ -40,6 +40,13 @@ class ContentType:
     IMAGE_JPEG = "image/jpeg"
     IMAGE_PNG = "image/png"
     IMAGE_TIFF = "image/tiff"
+    IMAGE_GIF = "image/gif"
+    IMAGE_WEBP = "image/webp"
+    IMAGE_BMP = "image/bmp"
+    VIDEO_MP4 = "video/mp4"
+    VIDEO_WEBM = "video/webm"
+    VIDEO_QUICKTIME = "video/quicktime"
+    VIDEO_AVI = "video/x-msvideo"
 
 # Define appropriate lengths for different field types
 USERNAME_MAX_LENGTH = 150

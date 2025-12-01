@@ -31,8 +31,28 @@ class Mime(wrapper.Wrapper):
         Returns true if MIME type is one of following:
             * image/png
             * image/jpg
+            * image/jpeg
+            * image/tiff
+            * image/gif
+            * image/webp
+            * image/bmp
         """
-        return self.guess() in ('image/png', 'image/jpg', 'image/jpeg')
+        return self.guess() in (
+            'image/png', 'image/jpg', 'image/jpeg', 'image/tiff',
+            'image/gif', 'image/webp', 'image/bmp'
+        )
+
+    def is_video(self):
+        """
+        Returns true if MIME type is one of following:
+            * video/mp4
+            * video/webm
+            * video/quicktime
+            * video/x-msvideo
+        """
+        return self.guess() in (
+            'video/mp4', 'video/webm', 'video/quicktime', 'video/x-msvideo'
+        )
 
     def guess(self):
         cmd = self.get_cmd()
