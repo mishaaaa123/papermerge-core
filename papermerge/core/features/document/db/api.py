@@ -724,6 +724,7 @@ async def update_text_field(db_session: AsyncSession, document_version_id: uuid.
 
     pages = [(row.id, row.text, row.number) for row in await db_session.execute(stmt)]
 
+    # Pair DB pages with OCR result streams; some pages may already have text.
     for page, stream in zip(pages, streams):
         if page[1] is None:  # page.text
             txt = stream.read()

@@ -203,13 +203,17 @@ async def upload_file(
             user_id=user.id,
             username=user.username
     ):
+        # FastAPI's UploadFile exposes the MIME type via `content_type`.
+        # Using headers.get("content-type") is unreliable and was returning None,
+        # which meant video uploads were not detected as videos and no metadata
+        # was extracted.
         doc, error = await dbapi.upload(
             db_session,
             document_id=document_id,
             size=file.size,
             content=io.BytesIO(content),
             file_name=file.filename,
-            content_type=file.headers.get("content-type"),
+            content_type=file.content_type,
         )
 
     if error:
