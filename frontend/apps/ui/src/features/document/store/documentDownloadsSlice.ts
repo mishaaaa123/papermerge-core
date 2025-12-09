@@ -18,25 +18,56 @@ const initialState: DocumentState = {
 
 export const fetchAndDownloadDocument = createAsyncThunk<
   void,
-  string,
+  {docVerId: string; password?: string},
   {rejectValue: string; state: {documentDownloads: DocumentState}}
 >(
   "document/fetchAndDownloadDocument",
-  async (docVerId, {rejectWithValue, getState}) => {
+  async ({docVerId, password}, {rejectWithValue, getState}) => {
     const state = getState() as RootState
     try {
       const response = await axios.get<{downloadURL: string}>(
         `/api/document-versions/${docVerId}/download-url`
       )
       const downloadURL = response.data.downloadURL
-      let url
+      if (!downloadURL) {
+        throw new Error("Download URL not provided by server")
+      }
 
-      if (downloadURL && !downloadURL.startsWith("/api/")) {
-        // cloud URL e.g. aws cloudfront URL
+      let url: string
+
+      if (downloadURL.startsWith("http://") || downloadURL.startsWith("https://")) {
+        // Absolute URL (cloud URL e.g. aws cloudfront URL)
         url = downloadURL
+      } else if (downloadURL.startsWith("/")) {
+        // Relative URL - construct absolute URL
+        const baseURL = getBaseURL(true)
+        if (!baseURL) {
+          // Fallback to current origin if baseURL is not set
+          url = `${window.location.origin}${downloadURL}`
+        } else {
+          url = `${baseURL}${downloadURL}`
+        }
       } else {
-        // use backend server URL (which may differ from frontend's URL)
-        url = `${getBaseURL(true)}${downloadURL}`
+        // Relative URL without leading slash
+        const baseURL = getBaseURL(true)
+        if (!baseURL) {
+          url = `${window.location.origin}/api/${downloadURL}`
+        } else {
+          url = `${baseURL}/${downloadURL}`
+        }
+      }
+
+      // Add password as query parameter if provided
+      if (password) {
+        try {
+          const urlObj = new URL(url)
+          urlObj.searchParams.set("password", password)
+          url = urlObj.toString()
+        } catch (error) {
+          // If URL construction fails, append password as query string manually
+          const separator = url.includes("?") ? "&" : "?"
+          url = `${url}${separator}password=${encodeURIComponent(password)}`
+        }
       }
 
       // Second: Fetch the actual file as blob
@@ -79,6 +110,23 @@ export const fetchAndDownloadDocument = createAsyncThunk<
           errorMessage =
             axiosError.response.data?.detail ||
             "You've reached the download rate limit. Please try again in a moment."
+        } else if (axiosError.response.status === 403) {
+          // Handle password-related errors
+          const errorDetail = axiosError.response.data
+          if (typeof errorDetail === "object" && errorDetail.detail) {
+            // Check if it's a structured error response
+            if (Array.isArray(errorDetail.detail) && errorDetail.detail.length > 0) {
+              errorMessage = errorDetail.detail[0]
+            } else if (typeof errorDetail.detail === "string") {
+              errorMessage = errorDetail.detail
+            } else {
+              errorMessage = "Password required or incorrect password"
+            }
+          } else if (typeof errorDetail === "string") {
+            errorMessage = errorDetail
+          } else {
+            errorMessage = "Password required or incorrect password"
+          }
         } else {
           errorMessage =
             axiosError.response.data?.detail ||
@@ -99,9 +147,9 @@ export const fetchAndDownloadDocument = createAsyncThunk<
     }
   },
   {
-    condition: (docVerId, {getState}) => {
+    condition: (arg, {getState}) => {
       const {loadingById} = getState().documentDownloads
-      if (loadingById[docVerId]) {
+      if (loadingById[arg.docVerId]) {
         // Prevent duplicate dispatch if already downloading
         return false
       }
@@ -117,16 +165,16 @@ const documentDownloadsSlice = createSlice({
   extraReducers: builder => {
     builder
       .addCase(fetchAndDownloadDocument.pending, (state, action) => {
-        const docVerId = action.meta.arg
+        const docVerId = action.meta.arg.docVerId
         state.loadingById[docVerId] = true
         state.errorById[docVerId] = null
       })
       .addCase(fetchAndDownloadDocument.fulfilled, (state, action) => {
-        const docVerId = action.meta.arg
+        const docVerId = action.meta.arg.docVerId
         state.loadingById[docVerId] = false
       })
       .addCase(fetchAndDownloadDocument.rejected, (state, action) => {
-        const docVerId = action.meta.arg
+        const docVerId = action.meta.arg.docVerId
         state.loadingById[docVerId] = false
         state.errorById[docVerId] = action.payload || "Unknown error"
       })

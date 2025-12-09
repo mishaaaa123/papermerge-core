@@ -12,13 +12,15 @@ interface Args {
   pageNumber: number
   pageSize: number
   imageSize: ImageSize
+  password?: string
 }
 
 export default function useGeneratePreviews({
   docVer,
   pageSize,
   pageNumber,
-  imageSize
+  imageSize,
+  password
 }: Args): boolean {
   const dispatch = useAppDispatch()
   const allPreviewsAreAvailable = useAreAllPreviewsAvailable({
@@ -35,12 +37,18 @@ export default function useGeneratePreviews({
       }
 
       if (!allPreviewsAreAvailable) {
+        // Don't try to load if password-protected and no password provided
+        if (docVer.is_password_protected && !password) {
+          console.log("Document is password-protected, password required")
+          return
+        }
+        
         if (!fileManager.getByDocVerID(docVer.id)) {
           const {
             ok,
             data,
             error: downloadError
-          } = await getDocLastVersion(docVer.document_id)
+          } = await getDocLastVersion(docVer.document_id, password)
           if (ok && data) {
             const arrayBuffer = await data.blob.arrayBuffer()
             fileManager.store({
@@ -48,7 +56,10 @@ export default function useGeneratePreviews({
               docVerID: data.docVerID
             })
           } else {
-            console.error(downloadError || "Unknown download error")
+            const errorMsg = downloadError || "Unknown download error"
+            console.error("Download error:", errorMsg)
+            // If it's a password error, we'll handle it in Viewer component
+            // by checking docVer.is_password_protected
             return
           }
         }
@@ -58,14 +69,15 @@ export default function useGeneratePreviews({
             size: imageSize,
             pageSize,
             pageNumber,
-            pageTotal: docVer.pages.length
+            pageTotal: docVer.pages.length,
+            password
           })
         )
       }
     }
 
     generate()
-  }, [dispatch, docVer, pageSize, pageNumber, allPreviewsAreAvailable])
+  }, [dispatch, docVer, pageSize, pageNumber, allPreviewsAreAvailable, password])
 
   return allPreviewsAreAvailable
 }

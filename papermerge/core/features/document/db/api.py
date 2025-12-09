@@ -31,6 +31,10 @@ from papermerge.core.features.ownership.db import api as ownership_api
 from papermerge.core.types import OwnerType, ResourceType, ImagePreviewStatus
 from papermerge.core.features.document import s3
 from papermerge.core.utils.misc import copy_file
+from papermerge.core.utils.encryption import (
+    encrypt_file_content,
+    hash_password,
+)
 from papermerge.core import schema, orm, constants, tasks
 from papermerge.core.features.custom_fields.db import api as cf_dbapi
 from papermerge.core.features.document.schema import Category, Tag
@@ -944,18 +948,43 @@ async def upload(
     size: int,
     file_name: str,
     content_type: str | None = None,
+    password: str | None = None,
 ) -> Tuple[schema.Document | None, schema.Error | None]:
 
     doc = await db_session.get(orm.Document, document_id)
     orig_ver = None
 
+    # Helper function to encrypt and save file if password is provided
+    async def save_file_with_encryption(
+        file_content: bytes | io.BytesIO,
+        dst_path: Path,
+        doc_version: orm.DocumentVersion,
+    ):
+        """Save file, encrypting if password is provided."""
+        if isinstance(file_content, io.BytesIO):
+            file_content = file_content.getvalue()
+        
+        if password:
+            # Encrypt the file content
+            encrypted_content, salt = encrypt_file_content(file_content, password)
+            # Save encrypted content
+            await copy_file(src=encrypted_content, dst=dst_path)
+            # Store password hash and salt
+            doc_version.is_password_protected = True
+            doc_version.password_hash = hash_password(password)
+            doc_version.encryption_salt = salt
+        else:
+            # Save unencrypted
+            await copy_file(src=file_content, dst=dst_path)
+            doc_version.is_password_protected = False
+            
     # Handle videos: store as-is, no PDF conversion
     if content_type and is_video(content_type):
         video_ver = await create_next_version(
             db_session, doc=doc, file_name=file_name, file_size=size
         )
         dst_path = abs_docver_path(video_ver.id, video_ver.file_name)
-        await copy_file(src=content, dst=dst_path)
+        await save_file_with_encryption(content, dst_path, video_ver)
 
         # Videos don't have pages in the traditional sense, but we set page_count to 1
         # for consistency with the data model
@@ -1008,9 +1037,13 @@ async def upload(
             file_size=len(pdf_content),
             short_description=f"{file_type(content_type)} -> pdf",
         )
-        await copy_file(src=content, dst=abs_docver_path(orig_ver.id, orig_ver.file_name))
+        await save_file_with_encryption(
+            content, abs_docver_path(orig_ver.id, orig_ver.file_name), orig_ver
+        )
 
-        await copy_file(src=pdf_content, dst=abs_docver_path(pdf_ver.id, pdf_ver.file_name))
+        await save_file_with_encryption(
+            pdf_content, abs_docver_path(pdf_ver.id, pdf_ver.file_name), pdf_ver
+        )
 
         page_count = get_pdf_page_count(pdf_content)
         orig_ver.page_count = page_count
@@ -1035,7 +1068,9 @@ async def upload(
         pdf_ver = await create_next_version(
             db_session, doc=doc, file_name=file_name, file_size=size
         )
-        await copy_file(src=content, dst=abs_docver_path(pdf_ver.id, pdf_ver.file_name))
+        await save_file_with_encryption(
+            content, abs_docver_path(pdf_ver.id, pdf_ver.file_name), pdf_ver
+        )
 
         page_count = get_pdf_page_count(content)
 
@@ -1141,7 +1176,9 @@ async def get_doc_versions_list(
     stmt = select(
         orm.DocumentVersion.id,
         orm.DocumentVersion.number,
-        orm.DocumentVersion.short_description
+        orm.DocumentVersion.short_description,
+        orm.DocumentVersion.is_password_protected,
+        orm.DocumentVersion.file_name
     ).where(
         orm.DocumentVersion.document_id == doc_id
     ).order_by(orm.DocumentVersion.number.desc())
@@ -1151,7 +1188,9 @@ async def get_doc_versions_list(
         schema.DocVerListItem(
             id=ver[0],
             number=ver[1],
-            short_description=ver[2]
+            short_description=ver[2],
+            is_password_protected=ver[3] if len(ver) > 3 else False,
+            file_name=ver[4] if len(ver) > 4 else None
         )
         for ver in db_vers
     ]
@@ -1182,9 +1221,6 @@ async def get_document_last_version(
     doc_id: uuid.UUID,
 ) -> schema.DocumentVersion:
     ...
-
-
-
 
 
 async def get_page_document_id(

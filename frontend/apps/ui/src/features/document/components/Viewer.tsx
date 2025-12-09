@@ -2,9 +2,10 @@ import {useAppDispatch, useAppSelector} from "@/app/hooks"
 import {useCurrentDoc} from "@/features/document/hooks"
 import {Flex, Group, Loader} from "@mantine/core"
 import {useDisclosure} from "@mantine/hooks"
-import {useContext} from "react"
+import {useContext, useState, useEffect} from "react"
 import {useNavigate} from "react-router-dom"
 import {setPanelComponent} from "@/features/ui/panelRegistry"
+import PasswordPromptModal from "./PasswordPromptModal"
 
 import Breadcrumbs from "@/components/Breadcrumbs"
 import PanelContext from "@/contexts/PanelContext"
@@ -75,12 +76,29 @@ export function Viewer({doc, docVer}: Args) {
   const navigate = useNavigate()
   const dispatch = useAppDispatch()
   const isVideoDoc = isVideoFileName(docVer?.file_name)
+  
+  // Password state for viewing password-protected documents
+  const [password, setPassword] = useState<string | null>(null)
+  const [passwordModalOpened, {open: openPasswordModal, close: closePasswordModal}] = useDisclosure(false)
+  const [passwordError, setPasswordError] = useState<string>("")
+  
+  // Check if document is password-protected and password is not set
+  const needsPassword = docVer?.is_password_protected && !password
+  
+  // Show password modal when document is password-protected
+  useEffect(() => {
+    if (docVer?.is_password_protected && !password && !passwordModalOpened) {
+      openPasswordModal()
+    }
+  }, [docVer?.is_password_protected, password, passwordModalOpened, openPasswordModal])
+  
   // Always call the hook to respect React's rules of hooks; for videos we simply ignore its result.
   const previewsReady = useGeneratePreviews({
     docVer: docVer,
     pageNumber: 1,
     pageSize: DOC_VER_PAGINATION_PAGE_BATCH_SIZE,
-    imageSize: "md"
+    imageSize: "md",
+    password: password || undefined
   })
   const allPreviewsAreAvailable = isVideoDoc ? true : previewsReady
   const selectedPages = useSelectedPages({mode, docVerID: docVer?.id})
@@ -204,6 +222,38 @@ export function Viewer({doc, docVer}: Args) {
 
   if (!docVer) {
     return <>No Doc Ver</>
+  }
+
+  const handlePasswordSubmit = (enteredPassword: string) => {
+    setPassword(enteredPassword)
+    setPasswordError("")
+    closePasswordModal()
+  }
+
+  const handlePasswordModalClose = () => {
+    // Don't allow closing without password for protected documents
+    if (needsPassword) {
+      setPasswordError("Password is required to view this document")
+      return
+    }
+    closePasswordModal()
+  }
+
+  // Show password modal if document is password-protected
+  if (needsPassword) {
+    return (
+      <div style={{display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", height: "100%", padding: "20px"}}>
+        <PasswordPromptModal
+          opened={passwordModalOpened}
+          fileName={docVer?.file_name || "document"}
+          onClose={handlePasswordModalClose}
+          onSubmit={handlePasswordSubmit}
+        />
+        {passwordError && (
+          <div style={{color: "red", marginTop: "10px", textAlign: "center"}}>{passwordError}</div>
+        )}
+      </div>
+    )
   }
 
   if (!allPreviewsAreAvailable) {

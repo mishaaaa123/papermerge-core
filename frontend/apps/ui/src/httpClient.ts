@@ -32,12 +32,36 @@ First gets the current `download_url`, as in case of S3 storage
 (S3 private storage actually) there expiration keys are
 valid for couple of minutes only
 */
-async function download_file(doc_ver: DocumentVersion) {
+async function download_file(doc_ver: DocumentVersion, password?: string) {
   const resp1 = await client.get(`/api/document-versions/${doc_ver.id}`)
   const v = resp1.data as DocumentVersion
   // now, with `download_url` at hand, actual download starts!
-  v.download_url
-  const resp2 = await client.get(v.download_url, {responseType: "blob"})
+  let downloadUrl = v.download_url
+  
+  // Add password as query parameter if provided
+  if (password && downloadUrl) {
+    try {
+      // Handle both absolute and relative URLs
+      if (downloadUrl.startsWith("/")) {
+        // Relative URL - construct full URL
+        const baseUrl = getBaseURL(true)
+        const urlObj = new URL(downloadUrl, baseUrl)
+        urlObj.searchParams.set("password", password)
+        downloadUrl = urlObj.toString()
+      } else if (downloadUrl.startsWith("http")) {
+        // Absolute URL
+        const urlObj = new URL(downloadUrl)
+        urlObj.searchParams.set("password", password)
+        downloadUrl = urlObj.toString()
+      }
+    } catch (e) {
+      // If URL construction fails, append password as query string manually
+      const separator = downloadUrl.includes("?") ? "&" : "?"
+      downloadUrl = `${downloadUrl}${separator}password=${encodeURIComponent(password)}`
+    }
+  }
+  
+  const resp2 = await client.get(downloadUrl, {responseType: "blob"})
   const blob = resp2.data
   const url = window.URL.createObjectURL(blob)
   /*

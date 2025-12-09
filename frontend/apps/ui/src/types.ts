@@ -407,6 +407,8 @@ export interface ClientDocumentVersion {
   Also angle here is set to 0. `initial_pages` attribute
   is used to restore `pages` attribute to their initial value  */
   initial_pages: Array<ClientPage>
+  // Password protection
+  is_password_protected?: boolean
 }
 
 export type NodeTag = {

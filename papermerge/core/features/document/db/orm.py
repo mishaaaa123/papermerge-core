@@ -2,7 +2,7 @@ import uuid
 from uuid import UUID
 from pathlib import Path
 
-from sqlalchemy import ForeignKey, Enum
+from sqlalchemy import ForeignKey, Enum, LargeBinary
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from papermerge.core.db.audit_cols import AuditColumns
@@ -80,6 +80,10 @@ class DocumentVersion(Base, AuditColumns):
     video_height: Mapped[int] = mapped_column(nullable=True)
     video_codec: Mapped[str] = mapped_column(nullable=True)
     short_description: Mapped[str] = mapped_column(nullable=True)
+    # Password protection fields
+    is_password_protected: Mapped[bool] = mapped_column(default=False)
+    password_hash: Mapped[str] = mapped_column(nullable=True)
+    encryption_salt: Mapped[bytes] = mapped_column(LargeBinary, nullable=True)  # Salt used for file encryption
     pages: Mapped[list["Page"]] = relationship(
         back_populates="document_version", lazy="select"
     )

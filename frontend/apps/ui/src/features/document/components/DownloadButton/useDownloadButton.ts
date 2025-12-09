@@ -39,7 +39,9 @@ export default function useDownloadButton({
         return {
           id: d.id,
           number: d.number,
-          shortDescription: d.short_description
+          shortDescription: d.short_description,
+          isPasswordProtected: d.is_password_protected || false,
+          fileName: d.file_name || ""
         }
       })
       setVersions(vers)

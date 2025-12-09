@@ -23,6 +23,7 @@ type UploadFileInput = {
   target: FolderType
   ocr: boolean
   lang: OCRCode
+  password?: string
 }
 
 type CreateDocumentType = {
@@ -132,6 +133,10 @@ export const uploadFile = createAsyncThunk<UploadFileOutput, UploadFileInput>(
     const form_data = new FormData()
 
     form_data.append("file", args.file)
+
+    if (args.password) {
+      form_data.append("password", args.password)
+    }
 
     defaultHeaders["Content-Type"] = "multipart/form-data"
 

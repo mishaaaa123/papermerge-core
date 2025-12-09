@@ -241,6 +241,8 @@ class DocumentVersion(BaseModel):
     video_width: int | None = None
     video_height: int | None = None
     video_codec: str | None = None
+    # Password protection
+    is_password_protected: bool = False
     download_url: DownloadUrl = None
     pages: list[BasicPage] | None = Field(default_factory=list)
 
@@ -262,6 +264,8 @@ class DocVerListItem(BaseModel):
     id: UUID
     number: int
     short_description: str | None = None
+    is_password_protected: bool = False
+    file_name: str | None = None
 
 
 def thumbnail_url(value, info):

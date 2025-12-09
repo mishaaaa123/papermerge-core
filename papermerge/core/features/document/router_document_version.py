@@ -1,10 +1,12 @@
 import logging
 import uuid
-from typing import Annotated
+import tempfile
+from pathlib import Path
+from typing import Annotated, Optional
 
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi import APIRouter, HTTPException, Security, Depends, status, Request
+from fastapi import APIRouter, HTTPException, Security, Depends, status, Request, Query
 
 from papermerge.core import schema, utils, dbapi, orm
 from papermerge.core.features.auth import get_current_user
@@ -14,6 +16,10 @@ from papermerge.core.db import common as dbapi_common
 from papermerge.core import exceptions as exc
 from papermerge.core.db.engine import get_db
 from papermerge.core.features.document.response import DocumentFileResponse
+from papermerge.core.utils.encryption import (
+    decrypt_file_content,
+    verify_password,
+)
 from papermerge.core.rate_limiter import (  # pyright: ignore[reportMissingImports]
     limiter,
     DOWNLOAD_RATE_LIMIT,
@@ -54,10 +60,13 @@ async def download_document_version(
         schema.User, Security(get_current_user, scopes=[scopes.DOCUMENT_DOWNLOAD])
     ],
     db_session: AsyncSession = Depends(get_db),
+    password: Optional[str] = Query(None, description="Password for password-protected files"),
 ):
     """Downloads given document version
 
     Required scope: `{scope}`
+    
+    If the document is password-protected, the password parameter must be provided.
     """
     request.state.user_id = str(user.id)
     logger.info(
@@ -103,6 +112,55 @@ async def download_document_version(
         error = schema.Error(messages=["Document version file not found"])
         raise HTTPException(status_code=404, detail=error.model_dump())
 
+    # Handle password-protected files
+    if doc_ver.is_password_protected:
+        if not password:
+            error = schema.Error(messages=["Password required for this protected file"])
+            raise HTTPException(status_code=403, detail=error.model_dump())
+        
+        # Verify password
+        if not verify_password(password, doc_ver.password_hash):
+            logger.warning(
+                "Incorrect password provided for document_version_id=%s user_id=%s",
+                document_version_id,
+                user.id,
+            )
+            error = schema.Error(messages=["Incorrect password"])
+            raise HTTPException(status_code=403, detail=error.model_dump())
+        
+        # Decrypt the file
+        try:
+            with open(doc_ver.file_path, "rb") as f:
+                encrypted_content = f.read()
+            
+            decrypted_content = decrypt_file_content(
+                encrypted_content,
+                password,
+                doc_ver.encryption_salt
+            )
+            
+            # Create a temporary file with decrypted content
+            with tempfile.NamedTemporaryFile(delete=False, suffix=Path(doc_ver.file_name).suffix) as tmp_file:
+                tmp_file.write(decrypted_content)
+                tmp_path = Path(tmp_file.name)
+            
+            # Return decrypted file (will be cleaned up by FastAPI)
+            return DocumentFileResponse(
+                tmp_path,
+                filename=doc_ver.file_name,
+                content_disposition_type="attachment"
+            )
+        except ValueError as e:
+            logger.error(
+                "Decryption failed for document_version_id=%s user_id=%s: %s",
+                document_version_id,
+                user.id,
+                str(e),
+            )
+            error = schema.Error(messages=["Failed to decrypt file"])
+            raise HTTPException(status_code=500, detail=error.model_dump())
+
+    # Return unencrypted file
     return DocumentFileResponse(
         doc_ver.file_path,
         filename=doc_ver.file_name,  # Will be in Content-Disposition header

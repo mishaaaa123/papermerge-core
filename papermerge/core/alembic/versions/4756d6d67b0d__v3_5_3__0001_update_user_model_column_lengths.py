@@ -20,38 +20,72 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.alter_column('users', 'email',
-                   existing_type=sa.String(),
-                   type_=sa.String(const.EMAIL_MAX_LENGTH),
-                   existing_nullable=False)
+    # Check if we're using SQLite
+    bind = op.get_bind()
+    is_sqlite = bind.dialect.name == 'sqlite'
+    
+    if is_sqlite:
+        # SQLite doesn't support ALTER COLUMN for type changes, use batch operations
+        with op.batch_alter_table('users') as batch_op:
+            batch_op.alter_column('email',
+                                 existing_type=sa.String(),
+                                 type_=sa.String(const.EMAIL_MAX_LENGTH),
+                                 existing_nullable=False)
+            batch_op.alter_column('password',
+                                 existing_type=sa.String(),
+                                 type_=sa.String(const.PASSWORD_MAX_LENGTH),
+                                 existing_nullable=False)
+            batch_op.alter_column('username',
+                                 existing_type=sa.String(),
+                                 type_=sa.String(const.USERNAME_MAX_LENGTH),
+                                 existing_nullable=False)
+            batch_op.alter_column('first_name',
+                                 existing_type=sa.String(),
+                                 type_=sa.String(const.NAME_MAX_LENGTH),
+                                 existing_nullable=False,
+                                 nullable=True,
+                                 existing_default=' ',
+                                 server_default=None)
+            batch_op.alter_column('last_name',
+                                 existing_type=sa.String(),
+                                 type_=sa.String(const.NAME_MAX_LENGTH),
+                                 existing_nullable=False,
+                                 nullable=True,
+                                 existing_default=' ',
+                                 server_default=None)
+    else:
+        op.alter_column('users', 'email',
+                       existing_type=sa.String(),
+                       type_=sa.String(const.EMAIL_MAX_LENGTH),
+                       existing_nullable=False)
 
-    op.alter_column('users', 'password',
-                   existing_type=sa.String(),
-                   type_=sa.String(const.PASSWORD_MAX_LENGTH),
-                   existing_nullable=False)
+        op.alter_column('users', 'password',
+                       existing_type=sa.String(),
+                       type_=sa.String(const.PASSWORD_MAX_LENGTH),
+                       existing_nullable=False)
 
-    op.alter_column('users', 'username',
-                   existing_type=sa.String(),
-                   type_=sa.String(const.USERNAME_MAX_LENGTH),
-                   existing_nullable=False)
+        op.alter_column('users', 'username',
+                       existing_type=sa.String(),
+                       type_=sa.String(const.USERNAME_MAX_LENGTH),
+                       existing_nullable=False)
 
-    # Update first_name: change length to 100 and make nullable with NULL default
-    op.alter_column('users', 'first_name',
-                   existing_type=sa.String(),
-                   type_=sa.String(const.NAME_MAX_LENGTH),
-                   existing_nullable=False,
-                   nullable=True,
-                   existing_default=' ',
-                   server_default=None)
+        # Update first_name: change length to 100 and make nullable with NULL default
+        op.alter_column('users', 'first_name',
+                       existing_type=sa.String(),
+                       type_=sa.String(const.NAME_MAX_LENGTH),
+                       existing_nullable=False,
+                       nullable=True,
+                       existing_default=' ',
+                       server_default=None)
 
-    # Update last_name: change length to 100 and make nullable with NULL default
-    op.alter_column('users', 'last_name',
-                   existing_type=sa.String(),
-                   type_=sa.String(const.NAME_MAX_LENGTH),
-                   existing_nullable=False,
-                   nullable=True,
-                   existing_default=' ',
-                   server_default=None)
+        # Update last_name: change length to 100 and make nullable with NULL default
+        op.alter_column('users', 'last_name',
+                       existing_type=sa.String(),
+                       type_=sa.String(const.NAME_MAX_LENGTH),
+                       existing_nullable=False,
+                       nullable=True,
+                       existing_default=' ',
+                       server_default=None)
 
 
 def downgrade() -> None:

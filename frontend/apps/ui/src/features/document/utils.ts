@@ -32,7 +32,8 @@ export function clientDVFromDV(v: DocumentVersion): ClientDocumentVersion {
     thumbnailsPagination: {
       page_number: 1,
       per_page: DOC_VER_PAGINATION_THUMBNAIL_BATCH_SIZE
-    }
+    },
+    is_password_protected: v.is_password_protected
   }
 
   return ver
@@ -89,7 +90,7 @@ interface ClientReturn {
   data?: DocData
 }
 
-export async function getDocLastVersion(docID: UUID): Promise<ClientReturn> {
+export async function getDocLastVersion(docID: UUID, password?: string): Promise<ClientReturn> {
   try {
     let resp = await client.get(`/api/documents/${docID}/last-version/`)
 
@@ -101,8 +102,32 @@ export async function getDocLastVersion(docID: UUID): Promise<ClientReturn> {
     }
 
     const docVer: DocVerShort = resp.data
+    let downloadUrl = docVer.download_url
 
-    resp = await client.get(docVer.download_url, {responseType: "blob"})
+    // Add password as query parameter if provided
+    if (password && downloadUrl) {
+      try {
+        // Handle both absolute and relative URLs
+        if (downloadUrl.startsWith("/")) {
+          // Relative URL - use base URL from client
+          const baseUrl = client.defaults.baseURL || window.location.origin
+          const urlObj = new URL(downloadUrl, baseUrl)
+          urlObj.searchParams.set("password", password)
+          downloadUrl = urlObj.toString()
+        } else if (downloadUrl.startsWith("http")) {
+          // Absolute URL
+          const urlObj = new URL(downloadUrl)
+          urlObj.searchParams.set("password", password)
+          downloadUrl = urlObj.toString()
+        }
+      } catch (e) {
+        // If URL construction fails, append password as query string manually
+        const separator = downloadUrl.includes("?") ? "&" : "?"
+        downloadUrl = `${downloadUrl}${separator}password=${encodeURIComponent(password)}`
+      }
+    }
+
+    resp = await client.get(downloadUrl, {responseType: "blob"})
     if (resp.status !== 200) {
       return {
         ok: false,

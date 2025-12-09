@@ -1,0 +1,22 @@
+#!/bin/bash
+# Script to fix Docker storage issues
+
+echo "Fixing Docker storage issues..."
+echo ""
+echo "Run these commands with sudo:"
+echo ""
+echo "1. Restart Docker:"
+echo "   sudo systemctl restart docker"
+echo ""
+echo "2. Check Docker tmp directory:"
+echo "   sudo ls -la /var/lib/docker/tmp"
+echo "   sudo chmod 755 /var/lib/docker/tmp"
+echo ""
+echo "3. Clean Docker:"
+echo "   docker system prune -a"
+echo ""
+echo "4. Try pulling PostgreSQL again:"
+echo "   docker pull postgres:15"
+echo ""
+echo "5. Start PostgreSQL:"
+echo "   docker run -d --name papermerge-postgres -e POSTGRES_DB=papermerge -e POSTGRES_USER=papermerge -e POSTGRES_PASSWORD=papermerge -p 5432:5432 postgres:15"

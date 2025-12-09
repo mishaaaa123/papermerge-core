@@ -12,6 +12,8 @@ export type DocVersItem = {
   id: string
   number: number
   short_description: string
+  is_password_protected?: boolean
+  file_name?: string
 }
 
 export type DocVersList = Array<DocVersItem>
@@ -35,6 +37,7 @@ export interface GeneratePreviewInputType {
   pageNumber: number
   pageTotal: number
   thumbnailListPageCount?: number
+  password?: string
 }
 
 export type BasicPageType = {
@@ -63,6 +66,8 @@ export type DocumentVersion = {
   video_width?: number | null
   video_height?: number | null
   video_codec?: string | null
+  // Password protection
+  is_password_protected?: boolean
 }
 
 export type NodeTag = {

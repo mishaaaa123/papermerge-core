@@ -11,4 +11,6 @@ export type DownloadDocumentVersion = {
   id: string
   number: number
   shortDescription: string
+  isPasswordProtected?: boolean
+  fileName?: string
 }

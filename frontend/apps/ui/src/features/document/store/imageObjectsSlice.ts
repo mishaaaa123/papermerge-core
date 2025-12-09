@@ -83,7 +83,7 @@ export const generatePreviews = createAsyncThunk<
       ok,
       data,
       error: downloadError
-    } = await getDocLastVersion(item.docVer.document_id)
+    } = await getDocLastVersion(item.docVer.document_id, item.password)
 
     if (ok && data) {
       const arrayBuffer = await data.blob.arrayBuffer()

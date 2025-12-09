@@ -10,6 +10,7 @@ from fastapi import (
     status,
     Query,
     Depends,
+    Form,
 )
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -164,6 +165,7 @@ async def upload_file(
     file: UploadFile,
     user: require_scopes(scopes.DOCUMENT_UPLOAD),
     db_session: AsyncSession = Depends(get_db),
+    password: str | None = Form(None, description="Optional password to protect the file"),
 ) -> schema.Document:
     """
     Uploads document's file.
@@ -178,6 +180,13 @@ async def upload_file(
 
         $ curl <server url>/documents/<uuid>/upload
         --form "file=@booking.pdf;type=application/pdf"
+        -H "Authorization: Bearer <your token>"
+
+    To upload with password protection:
+
+        $ curl <server url>/documents/<uuid>/upload
+        --form "file=@booking.pdf;type=application/pdf"
+        --form "password=mysecretpassword"
         -H "Authorization: Bearer <your token>"
 
     Note that `file=` is important and must be exactly that, it is the name
@@ -214,6 +223,7 @@ async def upload_file(
             content=io.BytesIO(content),
             file_name=file.filename,
             content_type=file.content_type,
+            password=password,
         )
 
     if error:
