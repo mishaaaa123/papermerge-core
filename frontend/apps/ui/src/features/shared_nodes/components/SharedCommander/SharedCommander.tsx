@@ -70,6 +70,9 @@ export default function SharedCommander() {
     useGetPaginatedSharedNodesQuery(queryParams)
 
   console.log("SharedCommander: query state - isLoading =", isLoading, "isFetching =", isFetching, "isError =", isError, "error =", error)
+  console.log("SharedCommander: data =", JSON.stringify(data, null, 2))
+  console.log("SharedCommander: data.items =", data?.items)
+  console.log("SharedCommander: data.items types =", data?.items?.map(item => ({id: item.id, ctype: item.ctype, title: item.title})))
 
   const skipFolderQuery =
     currentNodeID == SHARED_FOLDER_ROOT_ID || !currentNodeID

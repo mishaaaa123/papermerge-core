@@ -41,6 +41,7 @@ dependencies = [
     "python-magic (>=0.4.27)",
     "uritemplate (>=4.2.0)",
     "pdf2image (>=1.17.0)",
+    "pikepdf (>=8.0.0)",
     "uvicorn (>=0.38.0)",
     "python-jose (>=3.5.0)",
     "img2pdf (>=0.6.3)",
