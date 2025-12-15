@@ -19,7 +19,8 @@ import SharedBreadcrumb from "@/components/SharedBreadcrumb"
 import PanelContext from "@/contexts/PanelContext"
 import {
   useGetPaginatedSharedNodesQuery,
-  useGetSharedFolderQuery
+  useGetSharedFolderQuery,
+  useGetSharedDocumentQuery
 } from "@/features/shared_nodes/store/apiSlice"
 import {
   commanderLastPageSizeUpdated,
@@ -44,6 +45,7 @@ export default function SharedCommander() {
   const lastPageSize = useAppSelector(s => selectLastPageSize(s, mode))
   const currentNodeID = useAppSelector(selectCurrentSharedNodeID)
   const currentSharedRootID = useAppSelector(selectCurrentSharedRootID)
+  const currentNodeCType = useAppSelector(s => s.ui.currentSharedNode?.ctype)
 
   console.log("SharedCommander: mode =", mode)
   console.log("SharedCommander: currentNodeID =", currentNodeID)
@@ -73,13 +75,32 @@ export default function SharedCommander() {
   console.log("SharedCommander: data =", JSON.stringify(data, null, 2))
   console.log("SharedCommander: data.items =", data?.items)
   console.log("SharedCommander: data.items types =", data?.items?.map(item => ({id: item.id, ctype: item.ctype, title: item.title})))
+  console.log("SharedCommander: currentNodeCType =", currentNodeCType)
 
+  // Determine node type from Redux state (set by page loader)
+  const isFolder = currentNodeCType === "folder"
+  const isDocument = currentNodeCType === "document"
+
+  console.log("SharedCommander: isFolder =", isFolder, "isDocument =", isDocument)
+
+  // Only call folder query for folders
   const skipFolderQuery =
-    currentNodeID == SHARED_FOLDER_ROOT_ID || !currentNodeID
+    currentNodeID == SHARED_FOLDER_ROOT_ID || !currentNodeID || !isFolder
 
   const {data: currentFolder} = useGetSharedFolderQuery(
     skipFolderQuery ? skipToken : {nodeID: currentNodeID, currentSharedRootID}
   )
+
+  // Call document query for documents
+  const skipDocumentQuery =
+    currentNodeID == SHARED_FOLDER_ROOT_ID || !currentNodeID || !isDocument
+
+  const {data: currentDocument} = useGetSharedDocumentQuery(
+    skipDocumentQuery ? skipToken : {nodeID: currentNodeID, currentSharedRootID}
+  )
+
+  console.log("SharedCommander: currentFolder =", currentFolder)
+  console.log("SharedCommander: currentDocument =", currentDocument)
 
   if (isLoading && !data) {
     return <div>Loading...</div>
@@ -175,6 +196,7 @@ export default function SharedCommander() {
         <SharedBreadcrumb
           breadcrumb={
             currentFolder?.breadcrumb ||
+            currentDocument?.breadcrumb ||
             (SHARED_NODES_ROOT_BREADCRUMB as BreadcrumbType)
           }
           onClick={onClick}

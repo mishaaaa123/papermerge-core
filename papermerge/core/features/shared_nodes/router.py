@@ -70,15 +70,26 @@ async def get_node(
 
     Required scope: `{scope}`
     """
+    from papermerge.core.db import common as dbapi_common
+    from papermerge.core.exceptions import HTTP403Forbidden
+    
     order_by = ["ctype", "title", "created_at", "updated_at"]
 
     if params.order_by:
         order_by = [item.strip() for item in params.order_by.split(",")]
 
+    # Check if user has permission to view the parent folder
+    if not await dbapi_common.has_node_perm(
+        db_session,
+        node_id=uuid.UUID(parent_id),
+        codename=scopes.NODE_VIEW,
+        user_id=user.id,
+    ):
+        raise HTTP403Forbidden()
+
     nodes = await nodes_api.get_paginated_nodes(
         db_session=db_session,
         parent_id=uuid.UUID(parent_id),
-        user_id=user.id,
         page_size=params.page_size,
         page_number=params.page_number,
         order_by=order_by,

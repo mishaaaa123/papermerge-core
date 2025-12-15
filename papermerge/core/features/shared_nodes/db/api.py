@@ -383,14 +383,14 @@ async def update_shared_node_access(
 
 
 async def get_shared_folder(
-    db_session: AsyncSession, folder_id: uuid.UUID, shared_root_id: uuid.UUID
+    db_session: AsyncSession, folder_id: uuid.UUID, shared_root_id: uuid.UUID | None = None
 ) -> Tuple[orm.Folder | None, schema.Error | None]:
     breadcrumb = await dbapi_common.get_ancestors(db_session, folder_id)
     shorted_breadcrumb = []
     # user will see path only until its ancestor which is marked as shared root
     for b in reversed(breadcrumb):
         shorted_breadcrumb.append(b)
-        if b[0] == shared_root_id:
+        if shared_root_id and b[0] == shared_root_id:
             break
 
     shorted_breadcrumb.reverse()

@@ -82,15 +82,15 @@ export default function DownloadButtonContainer() {
 
   return (
     <>
-      <DownloadButton
-        i18nIsReady={i18nIsReady}
-        isLoading={isLoading}
-        onOpen={onOpen}
-        onClick={onDownloadVersionClick}
-        versions={versions}
-        isError={isError}
-        txt={txt}
-      />
+    <DownloadButton
+      i18nIsReady={i18nIsReady}
+      isLoading={isLoading}
+      onOpen={onOpen}
+      onClick={onDownloadVersionClick}
+      versions={versions}
+      isError={isError}
+      txt={txt}
+    />
       <PasswordPromptModal
         opened={passwordModal.opened}
         fileName={passwordModal.fileName}

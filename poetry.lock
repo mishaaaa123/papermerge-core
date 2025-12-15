@@ -3405,4 +3405,4 @@ cloud = ["boto3", "botocore", "cryptography"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.13,<4"
-content-hash = "b4730d5413c650240fc2907038c0930eafd24ca39f67429c6a3f77a31741f833"
+content-hash = "758a8332184b8dac40a21c15180aa425c07a68ef2ae31f529e48202cc304158a"

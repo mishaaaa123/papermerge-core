@@ -21,10 +21,10 @@ router = APIRouter(prefix="/shared-folders", tags=["shared-folders"])
 @utils.docstring_parameter(scope=scopes.NODE_VIEW)
 async def get_shared_folder_details(
     folder_id: uuid.UUID,
-    shared_root_id: uuid.UUID,
     user: Annotated[
         usr_schema.User, Security(get_current_user, scopes=[scopes.NODE_VIEW])
     ],
+    shared_root_id: uuid.UUID | None = None,
     db_session: AsyncSession=Depends(get_db),
 ) -> schema.Folder:
     """
