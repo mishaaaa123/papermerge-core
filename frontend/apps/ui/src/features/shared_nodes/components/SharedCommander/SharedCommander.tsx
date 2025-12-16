@@ -66,22 +66,12 @@ export default function SharedCommander() {
     sortColumn: sortColumn || "title"
   }
 
-  console.log("SharedCommander: queryParams =", queryParams)
-
   const {data, isLoading, isFetching, isError, error} =
     useGetPaginatedSharedNodesQuery(queryParams)
-
-  console.log("SharedCommander: query state - isLoading =", isLoading, "isFetching =", isFetching, "isError =", isError, "error =", error)
-  console.log("SharedCommander: data =", JSON.stringify(data, null, 2))
-  console.log("SharedCommander: data.items =", data?.items)
-  console.log("SharedCommander: data.items types =", data?.items?.map(item => ({id: item.id, ctype: item.ctype, title: item.title})))
-  console.log("SharedCommander: currentNodeCType =", currentNodeCType)
 
   // Determine node type from Redux state (set by page loader)
   const isFolder = currentNodeCType === "folder"
   const isDocument = currentNodeCType === "document"
-
-  console.log("SharedCommander: isFolder =", isFolder, "isDocument =", isDocument)
 
   // Only call folder query for folders
   const skipFolderQuery =
@@ -149,6 +139,8 @@ export default function SharedCommander() {
         break
     }
   }
+  
+  console.log("SharedCommander: data =", `/shared/document/`)
 
   const onPageNumberChange = (page: number) => {
     setPage(page)
@@ -186,7 +178,7 @@ export default function SharedCommander() {
       </>
     )
   } else {
-    commanderContent = <Group>Empty</Group>
+    commanderContent = <Group>Empty - New !!!!</Group>
   }
 
   return (

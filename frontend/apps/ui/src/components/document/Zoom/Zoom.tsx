@@ -2,7 +2,8 @@ import PanelContext from "@/contexts/PanelContext"
 import {
   zoomFactorDecremented,
   zoomFactorIncremented,
-  zoomFactorReseted
+  zoomFactorReseted,
+  viewerCurrentPageUpdated
 } from "@/features/ui/uiSlice"
 import type {PanelMode} from "@/types"
 import {useContext} from "react"
@@ -29,6 +30,18 @@ export default function ZoomContainer({pageNumber, pageTotal}: Args) {
     dispatch(zoomFactorReseted(mode))
   }
 
+  const goToPreviousPage = () => {
+    if (pageNumber > 1) {
+      dispatch(viewerCurrentPageUpdated({panel: mode, pageNumber: pageNumber - 1}))
+    }
+  }
+
+  const goToNextPage = () => {
+    if (pageNumber < pageTotal) {
+      dispatch(viewerCurrentPageUpdated({panel: mode, pageNumber: pageNumber + 1}))
+    }
+  }
+
   return (
     <Zoom
       pageNumber={pageNumber}
@@ -36,6 +49,8 @@ export default function ZoomContainer({pageNumber, pageTotal}: Args) {
       onFitClick={fitZoom}
       onZoomInClick={incZoom}
       onZoomOutClick={decZoom}
+      onPreviousPageClick={goToPreviousPage}
+      onNextPageClick={goToNextPage}
     />
   )
 }

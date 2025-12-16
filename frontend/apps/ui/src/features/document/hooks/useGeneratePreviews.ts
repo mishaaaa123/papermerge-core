@@ -1,10 +1,11 @@
 import {useAppDispatch} from "@/app/hooks"
 import useAreAllPreviewsAvailable from "@/features/document/hooks/useAreAllPreviewsAvailable"
 import {generatePreviews} from "@/features/document/store/imageObjectsSlice"
-import {getDocLastVersion} from "@/features/document/utils"
+import {getDocLastVersion, downloadFromUrl} from "@/features/document/utils"
 import {fileManager} from "@/features/files/fileManager"
 import {ClientDocumentVersion} from "@/types"
 import {ImageSize} from "@/types.d/common"
+import {UUID} from "@/types.d/common"
 import {useEffect} from "react"
 
 interface Args {
@@ -13,6 +14,7 @@ interface Args {
   pageSize: number
   imageSize: ImageSize
   password?: string
+  downloadUrl?: string // For shared documents - download URL from version
 }
 
 export default function useGeneratePreviews({
@@ -20,7 +22,8 @@ export default function useGeneratePreviews({
   pageSize,
   pageNumber,
   imageSize,
-  password
+  password,
+  downloadUrl
 }: Args): boolean {
   const dispatch = useAppDispatch()
   const allPreviewsAreAvailable = useAreAllPreviewsAvailable({
@@ -33,36 +36,68 @@ export default function useGeneratePreviews({
   useEffect(() => {
     const generate = async () => {
       if (!docVer) {
+        console.log("[useGeneratePreviews] No docVer, skipping")
         return
       }
+
+      console.log("[useGeneratePreviews] Checking previews:", {
+        docVerID: docVer.id,
+        documentID: docVer.document_id,
+        allPreviewsAreAvailable,
+        hasPDFInCache: !!fileManager.getByDocVerID(docVer.id),
+        pageCount: docVer.pages.length,
+        pageNumber,
+        pageSize,
+        imageSize
+      })
 
       if (!allPreviewsAreAvailable) {
         // Don't try to load if password-protected and no password provided
         if (docVer.is_password_protected && !password) {
-          console.log("Document is password-protected, password required")
+          console.log("[useGeneratePreviews] Document is password-protected, password required")
           return
         }
         
         if (!fileManager.getByDocVerID(docVer.id)) {
-          const {
-            ok,
-            data,
-            error: downloadError
-          } = await getDocLastVersion(docVer.document_id, password)
-          if (ok && data) {
-            const arrayBuffer = await data.blob.arrayBuffer()
+          console.log("[useGeneratePreviews] PDF not in cache, downloading...")
+          
+          let result: {ok: boolean; data?: {docVerID: UUID; blob: Blob}; error?: string}
+          
+          // For shared documents, use the downloadUrl directly
+          if (downloadUrl) {
+            console.log("[useGeneratePreviews] Using downloadUrl for shared document:", downloadUrl)
+            result = await downloadFromUrl(downloadUrl, docVer.id, password)
+          } else {
+            // For regular documents, use the standard endpoint
+            result = await getDocLastVersion(docVer.document_id, password)
+          }
+          
+          console.log("[useGeneratePreviews] Download result:", {
+            ok: result.ok,
+            hasData: !!result.data,
+            error: result.error,
+            docVerID: result.data?.docVerID
+          })
+          
+          if (result.ok && result.data) {
+            const arrayBuffer = await result.data.blob.arrayBuffer()
             fileManager.store({
               buffer: arrayBuffer,
-              docVerID: data.docVerID
+              docVerID: result.data.docVerID
             })
+            console.log("[useGeneratePreviews] PDF stored in cache")
           } else {
-            const errorMsg = downloadError || "Unknown download error"
-            console.error("Download error:", errorMsg)
+            const errorMsg = result.error || "Unknown download error"
+            console.error("[useGeneratePreviews] Download error:", errorMsg)
             // If it's a password error, we'll handle it in Viewer component
             // by checking docVer.is_password_protected
             return
           }
+        } else {
+          console.log("[useGeneratePreviews] PDF already in cache")
         }
+        
+        console.log("[useGeneratePreviews] Dispatching generatePreviews...")
         dispatch(
           generatePreviews({
             docVer,
@@ -73,11 +108,13 @@ export default function useGeneratePreviews({
             password
           })
         )
+      } else {
+        console.log("[useGeneratePreviews] All previews already available")
       }
     }
 
     generate()
-  }, [dispatch, docVer, pageSize, pageNumber, allPreviewsAreAvailable, password])
+  }, [dispatch, docVer, pageSize, pageNumber, allPreviewsAreAvailable, password, downloadUrl])
 
   return allPreviewsAreAvailable
 }

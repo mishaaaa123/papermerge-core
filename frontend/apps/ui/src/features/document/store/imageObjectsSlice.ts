@@ -70,6 +70,15 @@ export const generatePreviews = createAsyncThunk<
   ReturnType,
   GeneratePreviewInputType
 >("images/generatePreview", async item => {
+  console.log("[generatePreviews thunk] Starting:", {
+    docVerID: item.docVer.id,
+    documentID: item.docVer.document_id,
+    size: item.size,
+    pageNumber: item.pageNumber,
+    pageSize: item.pageSize,
+    pageTotal: item.pageTotal
+  })
+  
   const width = getWidth(item.size)
 
   const result: ReturnType = {
@@ -78,12 +87,19 @@ export const generatePreviews = createAsyncThunk<
   let fileItem = fileManager.getByDocVerID(item.docVer.id)
 
   if (!fileItem) {
+    console.log("[generatePreviews thunk] PDF not in cache, downloading...")
     // file not found in local storage. Download it first
     const {
       ok,
       data,
       error: downloadError
     } = await getDocLastVersion(item.docVer.document_id, item.password)
+
+    console.log("[generatePreviews thunk] Download result:", {
+      ok,
+      hasData: !!data,
+      error: downloadError
+    })
 
     if (ok && data) {
       const arrayBuffer = await data.blob.arrayBuffer()
@@ -92,13 +108,16 @@ export const generatePreviews = createAsyncThunk<
         docVerID: data.docVerID
       }
       fileManager.store(fileItem)
+      console.log("[generatePreviews thunk] PDF stored in cache, size:", arrayBuffer.byteLength)
     } else {
-      console.error(downloadError || "Unknown download error")
+      console.error("[generatePreviews thunk] Download error:", downloadError || "Unknown download error")
       return {
         items: [],
         error: "There was an error generating thumbnail image"
       }
     }
+  } else {
+    console.log("[generatePreviews thunk] PDF already in cache")
   }
 
   const file = new File([fileItem.buffer], "filename.pdf", {
@@ -126,31 +145,41 @@ export const generatePreviews = createAsyncThunk<
 
   for (let pIndex = firstPage; pIndex < lastPage; pIndex++) {
     if (pIndex >= sortedPagesTotal) {
-      console.error(`Page index ${pIndex} out of bound: ${sortedPagesTotal}`)
+      console.error(`[generatePreviews thunk] Page index ${pIndex} out of bound: ${sortedPagesTotal}`)
       return {
         items: [],
         error: `Page index ${pIndex} out of bound: ${sortedPagesTotal}`
       }
     }
     const page = sortedPages[pIndex]
-    const objectURL = await util_pdf_generatePreview({
-      file: file,
-      width,
-      pageNumber: page.number
-    })
-
-    if (objectURL) {
-      result.items.push({
-        pageID: page.id,
-        docID: item.docVer.document_id,
-        docVerID: item.docVer.id,
-        pageNumber: page.number,
-        objectURL: objectURL,
-        size: item.size
+    console.log(`[generatePreviews thunk] Generating preview for page ${page.number} (pageID: ${page.id})`)
+    
+    try {
+      const objectURL = await util_pdf_generatePreview({
+        file: file,
+        width,
+        pageNumber: page.number
       })
+
+      if (objectURL) {
+        console.log(`[generatePreviews thunk] Preview generated for page ${page.number}:`, objectURL.substring(0, 50))
+        result.items.push({
+          pageID: page.id,
+          docID: item.docVer.document_id,
+          docVerID: item.docVer.id,
+          pageNumber: page.number,
+          objectURL: objectURL,
+          size: item.size
+        })
+      } else {
+        console.error(`[generatePreviews thunk] No objectURL returned for page ${page.number}`)
+      }
+    } catch (error) {
+      console.error(`[generatePreviews thunk] Error generating preview for page ${page.number}:`, error)
     }
   }
 
+  console.log(`[generatePreviews thunk] Completed, generated ${result.items.length} previews`)
   return result
 })
 
@@ -319,6 +348,17 @@ const imageObjectsSlice = createSlice({
   },
   extraReducers: builder => {
     builder.addCase(generatePreviews.fulfilled, (state, action) => {
+      console.log("[imageObjectsSlice] generatePreviews.fulfilled:", {
+        itemsCount: action.payload.items.length,
+        items: action.payload.items.map(item => ({
+          pageID: item.pageID,
+          pageNumber: item.pageNumber,
+          size: item.size,
+          hasObjectURL: !!item.objectURL,
+          objectURL: item.objectURL?.substring(0, 50) + "..."
+        }))
+      })
+      
       for (const {
         pageID,
         size,
@@ -329,7 +369,10 @@ const imageObjectsSlice = createSlice({
       } of action.payload.items) {
         const existing = state.pageIDEntities[pageID] ?? {}
         const oldUrl = existing[size]
-        if (oldUrl) URL.revokeObjectURL(oldUrl)
+        if (oldUrl) {
+          console.log(`[imageObjectsSlice] Revoking old blob URL for pageID ${pageID}, size ${size}`)
+          URL.revokeObjectURL(oldUrl)
+        }
 
         state.pageIDEntities[pageID] = {
           ...existing,
@@ -338,6 +381,8 @@ const imageObjectsSlice = createSlice({
           docVerID: docVerID,
           pageNumber: pageNumber
         }
+        
+        console.log(`[imageObjectsSlice] Stored blob URL for pageID ${pageID}, size ${size}:`, objectURL?.substring(0, 50))
       }
     })
 

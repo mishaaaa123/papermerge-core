@@ -68,6 +68,8 @@ export type DocumentVersion = {
   video_codec?: string | null
   // Password protection
   is_password_protected?: boolean
+  // Download URL (included in API responses)
+  download_url?: string | null
 }
 
 export type NodeTag = {

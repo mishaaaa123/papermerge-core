@@ -1,7 +1,7 @@
 import {useAppDispatch, useAppSelector} from "@/app/hooks"
 
 import {Flex, Group, Loader} from "@mantine/core"
-import {useContext, useRef} from "react"
+import {useContext, useRef, useMemo} from "react"
 import {useNavigate} from "react-router-dom"
 
 import {
@@ -42,12 +42,42 @@ export default function SharedViewer() {
   const navigate = useNavigate()
   const dispatch = useAppDispatch()
 
+  // Get download_url from the last version for shared documents
+  const downloadUrl = useMemo(() => {
+    console.log("[SharedViewer] Extracting downloadUrl from doc:", {
+      hasDoc: !!doc,
+      hasVersions: !!doc?.versions,
+      versionsCount: doc?.versions?.length,
+      versions: doc?.versions?.map(v => ({id: v.id, number: v.number, download_url: v.download_url}))
+    })
+    if (!doc?.versions || doc.versions.length === 0) {
+      console.log("[SharedViewer] No versions found, returning undefined")
+      return undefined
+    }
+    const lastVersion = doc.versions.reduce((latest, v) => 
+      v.number > latest.number ? v : latest
+    )
+    console.log("[SharedViewer] Last version:", {
+      id: lastVersion.id,
+      number: lastVersion.number,
+      download_url: lastVersion.download_url
+    })
+    return lastVersion.download_url || undefined
+  }, [doc?.versions])
+
+  console.log("[SharedViewer] Calling useGeneratePreviews with:", {
+    hasDocVer: !!docVer,
+    docVerID: docVer?.id,
+    downloadUrl: downloadUrl
+  })
+
   /* generate first batch of previews: for pages and for their thumbnails */
   const allPreviewsAreAvailable = useGeneratePreviews({
     docVer: docVer,
     pageNumber: 1,
     pageSize: DOC_VER_PAGINATION_PAGE_BATCH_SIZE,
-    imageSize: "md"
+    imageSize: "md",
+    downloadUrl: downloadUrl // Pass download_url for shared documents
   })
 
   const lastPageSize = useAppSelector(s => selectLastPageSize(s, mode))

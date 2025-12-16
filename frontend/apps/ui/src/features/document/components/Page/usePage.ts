@@ -26,6 +26,16 @@ export default function usePage({pageNumber, pageID}: Args): PageState {
   const zoomFactor = useAppSelector(s => selectZoomFactor(s, mode))
   const bestImageURL = useAppSelector(s => selectBestImageByPageId(s, pageID))
 
+  // Debug logging
+  useEffect(() => {
+    console.log(`[usePage] Page ${pageNumber} (pageID: ${pageID}):`, {
+      imageURL: bestImageURL,
+      hasImageURL: !!bestImageURL,
+      isBlobURL: bestImageURL?.startsWith("blob:"),
+      isLoading: !bestImageURL
+    })
+  }, [pageNumber, pageID, bestImageURL])
+
   useEffect(() => {
     if (currentPage == pageNumber) {
       if (targetRef.current) {

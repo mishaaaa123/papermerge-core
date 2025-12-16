@@ -90,6 +90,60 @@ interface ClientReturn {
   data?: DocData
 }
 
+export async function downloadFromUrl(
+  downloadUrl: string,
+  docVerID: UUID,
+  password?: string
+): Promise<ClientReturn> {
+  try {
+    let url = downloadUrl
+
+    // Add password as query parameter if provided
+    if (password && url) {
+      try {
+        // Handle both absolute and relative URLs
+        if (url.startsWith("/")) {
+          // Relative URL - use base URL from client
+          const baseUrl = client.defaults.baseURL || window.location.origin
+          const urlObj = new URL(url, baseUrl)
+          urlObj.searchParams.set("password", password)
+          url = urlObj.toString()
+        } else if (url.startsWith("http")) {
+          // Absolute URL
+          const urlObj = new URL(url)
+          urlObj.searchParams.set("password", password)
+          url = urlObj.toString()
+        }
+      } catch {
+        // If URL construction fails, append password as query string manually
+        const separator = url.includes("?") ? "&" : "?"
+        url = `${url}${separator}password=${encodeURIComponent(password)}`
+      }
+    }
+
+    const resp = await client.get(url, {responseType: "blob"})
+    if (resp.status !== 200) {
+      return {
+        ok: false,
+        error: `Error downloading file from ${downloadUrl}: ${resp.status}`
+      }
+    }
+
+    return {ok: true, data: {docVerID: docVerID, blob: resp.data}}
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      return {
+        ok: false,
+        error: `Request failed: ${error.response?.status || "Network error"} - ${error.message}`
+      }
+    }
+    return {
+      ok: false,
+      error: `Unexpected error: ${error instanceof Error ? error.message : "Unknown error"}`
+    }
+  }
+}
+
 export async function getDocLastVersion(docID: UUID, password?: string): Promise<ClientReturn> {
   try {
     let resp = await client.get(`/api/documents/${docID}/last-version/`)
@@ -120,7 +174,7 @@ export async function getDocLastVersion(docID: UUID, password?: string): Promise
           urlObj.searchParams.set("password", password)
           downloadUrl = urlObj.toString()
         }
-      } catch (e) {
+      } catch {
         // If URL construction fails, append password as query string manually
         const separator = downloadUrl.includes("?") ? "&" : "?"
         downloadUrl = `${downloadUrl}${separator}password=${encodeURIComponent(password)}`

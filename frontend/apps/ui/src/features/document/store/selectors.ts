@@ -19,7 +19,18 @@ export const selectBestImageByPageId = (
   page_id: string
 ): string | undefined => {
   const sizes = state.imageObjects.pageIDEntities[page_id]
-  return sizes?.xl || sizes?.lg || sizes?.md || sizes?.sm
+  const imageURL = sizes?.xl || sizes?.lg || sizes?.md || sizes?.sm
+  
+  // Debug logging
+  if (!imageURL && page_id) {
+    console.log(`[selectBestImageByPageId] No imageURL for pageID: ${page_id}`, {
+      pageIDEntities: Object.keys(state.imageObjects.pageIDEntities).slice(0, 5),
+      availableSizes: sizes ? Object.keys(sizes) : "none",
+      fullState: sizes
+    })
+  }
+  
+  return imageURL
 }
 
 export const selectSmallImageByPageId = (

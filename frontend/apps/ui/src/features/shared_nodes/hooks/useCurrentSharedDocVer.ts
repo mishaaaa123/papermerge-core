@@ -1,19 +1,18 @@
 import {useAppDispatch, useAppSelector} from "@/app/hooks"
-import {useGetDocLastVersionQuery} from "@/features/document/store/apiSlice"
-import {selectLatestDocVerByDocID} from "@/features/document/store/docsSlice"
 import {
-  addDocVersion,
   selectDocVerByID
 } from "@/features/document/store/documentVersSlice"
-import {clientDVFromDV} from "@/features/document/utils"
 import {
-  currentDocVerUpdated,
-  selectCurrentSharedNodeID
+  DOC_VER_PAGINATION_PAGE_BATCH_SIZE,
+  DOC_VER_PAGINATION_THUMBNAIL_BATCH_SIZE
+} from "@/features/document/constants"
+import {
+  currentDocVerUpdated
 } from "@/features/ui/uiSlice"
-import {ClientDocumentVersion} from "@/types"
 import type {FetchBaseQueryError} from "@reduxjs/toolkit/query"
-import {skipToken} from "@reduxjs/toolkit/query"
-import {useEffect, useMemo} from "react"
+import {ClientDocumentVersion} from "@/types"
+import {useMemo, useEffect} from "react"
+import useCurrentSharedDoc from "./useCurrentSharedDoc"
 
 interface SerializedError {
   name?: string
@@ -30,44 +29,73 @@ interface ReturnState {
 
 export default function useSharedCurrentDocVer(): ReturnState {
   const dispatch = useAppDispatch()
-  const currentNodeID = useAppSelector(selectCurrentSharedNodeID)
-  const latestDocVerID = useAppSelector(s =>
-    selectLatestDocVerByDocID(s, currentNodeID)
-  )
-  const docVerFromSlice = useAppSelector(s =>
-    selectDocVerByID(s, latestDocVerID)
-  )
-  const {
-    // should be `currentData` here not `data`, otherwise there will
-    // be a flicker previous document when user opens viewer
-    currentData,
-    isFetching,
-    isSuccess,
-    isError,
-    error
-  } = useGetDocLastVersionQuery(currentNodeID ?? skipToken)
-
-  useEffect(() => {
-    if (currentData) {
-      // set current docVer to the value of docVer
-      // return docVer as current one
-
-      if (!latestDocVerID) {
-        dispatch(addDocVersion(currentData))
-      }
-      dispatch(currentDocVerUpdated({mode: "main", docVerID: currentData.id}))
-    }
-  }, [currentData, latestDocVerID, currentNodeID])
-
-  const docVer: ClientDocumentVersion | undefined = useMemo(() => {
-    if (docVerFromSlice) {
-      return docVerFromSlice
-    } else if (currentData) {
-      return clientDVFromDV(currentData)
-    } else {
+  const {doc} = useCurrentSharedDoc() // Get doc which already has all versions
+  
+  // Extract the last version from doc.versions (already fetched by useCurrentSharedDoc)
+  const lastVersion = useMemo(() => {
+    if (!doc?.versions || doc.versions.length === 0) {
       return undefined
     }
-  }, [currentData, docVerFromSlice, latestDocVerID, latestDocVerID, "main"])
+    // Find version with highest number (last version)
+    return doc.versions.reduce((latest, v) => 
+      v.number > latest.number ? v : latest
+    )
+  }, [doc?.versions])
+
+  // Get the docVer from Redux store (it was added by documentVersSlice reducer when getSharedDocument succeeded)
+  const docVerFromSlice = useAppSelector(s =>
+    selectDocVerByID(s, lastVersion?.id)
+  )
+
+  // Update current docVer in UI state when we have the last version
+  useEffect(() => {
+    if (lastVersion?.id) {
+      dispatch(currentDocVerUpdated({mode: "main", docVerID: lastVersion.id}))
+    }
+  }, [lastVersion?.id, dispatch])
+
+  const docVer: ClientDocumentVersion | undefined = useMemo(() => {
+    // First try to get from Redux store (preferred, has all client-side fields)
+    if (docVerFromSlice) {
+      return docVerFromSlice
+    }
+    // If not in store yet, convert from server version
+    // Note: This should rarely happen as documentVersSlice adds versions when getSharedDocument succeeds
+    if (lastVersion) {
+      // Convert server version to client version format
+      return {
+        id: lastVersion.id,
+        lang: lastVersion.lang,
+        number: lastVersion.number,
+        file_name: lastVersion.file_name,
+        document_id: lastVersion.document_id,
+        size: lastVersion.size,
+        short_description: lastVersion.short_description,
+        pages: lastVersion.pages.map(p => ({
+          id: p.id,
+          number: p.number,
+          angle: 0
+        })),
+        initial_pages: [...lastVersion.pages]
+          .sort((a, b) => a.number - b.number)
+          .map(p => ({
+            id: p.id,
+            number: p.number,
+            angle: 0
+          })),
+        pagination: {
+          page_number: 1,
+          per_page: DOC_VER_PAGINATION_PAGE_BATCH_SIZE
+        },
+        thumbnailsPagination: {
+          page_number: 1,
+          per_page: DOC_VER_PAGINATION_THUMBNAIL_BATCH_SIZE
+        },
+        is_password_protected: lastVersion.is_password_protected || false
+      } as ClientDocumentVersion
+    }
+    return undefined
+  }, [docVerFromSlice, lastVersion])
 
   return {
     error: undefined,
