@@ -5,6 +5,8 @@ import type {AxiosError} from "axios"
 import {notifications} from "@mantine/notifications"
 import {getBaseURL} from "@/utils"
 import {createAsyncThunk, createSlice} from "@reduxjs/toolkit"
+import {downloadFromUrl} from "@/features/document/utils"
+import {UUID} from "@/types.d/common"
 
 interface DocumentState {
   loadingById: Record<string, boolean>
@@ -57,40 +59,18 @@ export const fetchAndDownloadDocument = createAsyncThunk<
         }
       }
 
-      // Add password as query parameter if provided
-      if (password) {
-        try {
-          const urlObj = new URL(url)
-          urlObj.searchParams.set("password", password)
-          url = urlObj.toString()
-        } catch (error) {
-          // If URL construction fails, append password as query string manually
-          const separator = url.includes("?") ? "&" : "?"
-          url = `${url}${separator}password=${encodeURIComponent(password)}`
-        }
-      }
+      // Second: Use downloadFromUrl to download the file (throws errors on failure)
+      const result = await downloadFromUrl(url, docVerId as UUID, password)
 
-      // Second: Fetch the actual file as blob
-      const fileResponse = await axios.get(url, {
-        responseType: "blob"
-      })
-      // Extract filename from Content-Disposition header
-      let filename = extractFilenameFromHeader(
-        fileResponse.headers["content-disposition"]
-      )
-
-      // Fallback to Redux state or default
-      if (!filename) {
-        const docVer = state.docVers.entities[docVerId]
-        filename = docVer?.file_name || `document-${docVerId}.pdf`
-      }
+      // Extract filename from Redux state or default
+      const docVer = state.docVers.entities[docVerId]
+      const filename = docVer?.file_name || `document-${docVerId}.pdf`
 
       // Get content type for proper blob creation
-      const contentType =
-        fileResponse.headers["content-type"] || "application/octet-stream"
+      const contentType = "application/pdf" // Default to PDF for document downloads
 
       // Third: Create blob URL and trigger download
-      const blob = new Blob([fileResponse.data], {type: contentType})
+      const blob = new Blob([result.blob], {type: contentType})
       const blobUrl = window.URL.createObjectURL(blob)
 
       const anchor = document.createElement("a")
@@ -103,45 +83,45 @@ export const fetchAndDownloadDocument = createAsyncThunk<
       window.URL.revokeObjectURL(blobUrl) // Cleanup
     } catch (err: any) {
       let errorMessage = "Download failed"
-      const axiosError = err as AxiosError<{detail?: string}>
-
-      if (axiosError?.response) {
-        if (axiosError.response.status === 429) {
-          errorMessage =
-            axiosError.response.data?.detail ||
-            "You've reached the download rate limit. Please try again in a moment."
-        } else if (axiosError.response.status === 403) {
-          // Handle password-related errors
-          const errorDetail = axiosError.response.data
-          if (typeof errorDetail === "object" && errorDetail.detail) {
-            // Check if it's a structured error response
-            if (Array.isArray(errorDetail.detail) && errorDetail.detail.length > 0) {
-              errorMessage = errorDetail.detail[0]
-            } else if (typeof errorDetail.detail === "string") {
-              errorMessage = errorDetail.detail
-            } else {
-              errorMessage = "Password required or incorrect password"
-            }
-          } else if (typeof errorDetail === "string") {
-            errorMessage = errorDetail
+      
+      // downloadFromUrl throws Error with message, so extract it first
+      if (err instanceof Error) {
+        errorMessage = err.message
+      } else {
+        // Handle other error types (e.g., from getting download URL)
+        const axiosError = err as AxiosError<{detail?: string}>
+        
+        if (axiosError?.response) {
+          if (axiosError.response.status === 429) {
+            errorMessage =
+              axiosError.response.data?.detail ||
+              "You've reached the download rate limit. Please try again in a moment."
           } else {
-            errorMessage = "Password required or incorrect password"
+            errorMessage =
+              axiosError.response.data?.detail ||
+              axiosError.message ||
+              "Download failed"
           }
-        } else {
-          errorMessage =
-            axiosError.response.data?.detail ||
-            axiosError.message ||
-            "Download failed"
+        } else if (axiosError?.message) {
+          errorMessage = axiosError.message
         }
-      } else if (axiosError?.message) {
-        errorMessage = axiosError.message
       }
 
-      notifications.show({
-        color: "red",
-        title: "Download blocked",
-        message: errorMessage
-      })
+      // Only show notification for non-password errors
+      // Password errors are handled by the password modal
+      const isPasswordError = 
+        errorMessage.includes("password") || 
+        errorMessage.includes("Password") || 
+        errorMessage.includes("403") ||
+        errorMessage.includes("Incorrect")
+      
+      if (!isPasswordError) {
+        notifications.show({
+          color: "red",
+          title: "Download blocked",
+          message: errorMessage
+        })
+      }
 
       return rejectWithValue(errorMessage)
     }

@@ -91,54 +91,84 @@ interface ClientReturn {
   isPasswordError?: boolean
 }
 
+// Return type for downloadFromUrl - throws errors instead of returning error objects
+interface DownloadResult {
+  docVerID: UUID
+  blob: Blob
+}
+
 export async function downloadFromUrl(
   downloadUrl: string,
   docVerID: UUID,
   password?: string
-): Promise<ClientReturn> {
+): Promise<DownloadResult> {
+  let url = downloadUrl
+
+  // Add password as query parameter if provided
+  if (password && url) {
+    try {
+      // Handle both absolute and relative URLs
+      if (url.startsWith("/")) {
+        // Relative URL - use base URL from client
+        const baseUrl = client.defaults.baseURL || window.location.origin
+        const urlObj = new URL(url, baseUrl)
+        urlObj.searchParams.set("password", password)
+        url = urlObj.toString()
+      } else if (url.startsWith("http")) {
+        // Absolute URL
+        const urlObj = new URL(url)
+        urlObj.searchParams.set("password", password)
+        url = urlObj.toString()
+      }
+    } catch {
+      // If URL construction fails, append password as query string manually
+      const separator = url.includes("?") ? "&" : "?"
+      url = `${url}${separator}password=${encodeURIComponent(password)}`
+    }
+  }
+
   try {
-    let url = downloadUrl
-
-    // Add password as query parameter if provided
-    if (password && url) {
-      try {
-        // Handle both absolute and relative URLs
-        if (url.startsWith("/")) {
-          // Relative URL - use base URL from client
-          const baseUrl = client.defaults.baseURL || window.location.origin
-          const urlObj = new URL(url, baseUrl)
-          urlObj.searchParams.set("password", password)
-          url = urlObj.toString()
-        } else if (url.startsWith("http")) {
-          // Absolute URL
-          const urlObj = new URL(url)
-          urlObj.searchParams.set("password", password)
-          url = urlObj.toString()
-        }
-      } catch {
-        // If URL construction fails, append password as query string manually
-        const separator = url.includes("?") ? "&" : "?"
-        url = `${url}${separator}password=${encodeURIComponent(password)}`
-      }
-    }
-
     const resp = await client.get(url, {responseType: "blob"})
-    if (resp.status !== 200) {
-      return {
-        ok: false,
-        error: `Error downloading file from ${downloadUrl}: ${resp.status}`
+    
+    if (resp.status === 403) {
+      // Password error - extract error message and throw
+      const errorDetail = resp.data
+      let errorMessage = "Password required or incorrect password"
+      
+      // Try to extract error message from response
+      if (errorDetail) {
+        if (typeof errorDetail === "object" && errorDetail.detail) {
+          if (Array.isArray(errorDetail.detail) && errorDetail.detail.length > 0) {
+            errorMessage = errorDetail.detail[0]
+          } else if (typeof errorDetail.detail === "string") {
+            errorMessage = errorDetail.detail
+          }
+        } else if (typeof errorDetail === "string") {
+          errorMessage = errorDetail
+        }
       }
+      
+      throw new Error(errorMessage)
+    }
+    
+    if (resp.status !== 200) {
+      throw new Error(`Error downloading file from ${downloadUrl}: ${resp.status}`)
     }
 
-    return {ok: true, data: {docVerID: docVerID, blob: resp.data}}
+    return {docVerID: docVerID, blob: resp.data}
   } catch (error) {
+    // If it's already an Error we threw, re-throw it
+    if (error instanceof Error) {
+      throw error
+    }
+    
+    // Handle axios errors
     if (axios.isAxiosError(error)) {
-      // Check for password-related errors (403 status)
       if (error.response?.status === 403) {
+        // Password error - extract error message
         const errorDetail = error.response.data
         let errorMessage = "Password required or incorrect password"
         
-        // Try to extract error message from response
         if (errorDetail) {
           if (typeof errorDetail === "object" && errorDetail.detail) {
             if (Array.isArray(errorDetail.detail) && errorDetail.detail.length > 0) {
@@ -151,81 +181,64 @@ export async function downloadFromUrl(
           }
         }
         
-        return {
-          ok: false,
-          error: errorMessage,
-          isPasswordError: true
-        }
+        throw new Error(errorMessage)
       }
       
-      return {
-        ok: false,
-        error: `Request failed: ${error.response?.status || "Network error"} - ${error.message}`
-      }
+      throw new Error(`Request failed: ${error.response?.status || "Network error"} - ${error.message}`)
     }
-    return {
-      ok: false,
-      error: `Unexpected error: ${error instanceof Error ? error.message : "Unknown error"}`
-    }
+    
+    throw new Error(`Unexpected error: ${error instanceof Error ? error.message : "Unknown error"}`)
   }
 }
 
-export async function getDocLastVersion(docID: UUID, password?: string): Promise<ClientReturn> {
+export async function getDocLastVersion(docID: UUID, password?: string): Promise<DownloadResult> {
   try {
     let resp = await client.get(`/api/documents/${docID}/last-version/`)
 
     if (resp.status !== 200) {
-      return {
-        ok: false,
-        error: `Error downloading URL for ${docID}: ${resp.status}`
-      }
+      throw new Error(`Error downloading URL for ${docID}: ${resp.status}`)
     }
 
     const docVer: DocVerShort = resp.data
-    let downloadUrl = docVer.download_url
+    const downloadUrl = docVer.download_url
 
-    // Add password as query parameter if provided
-    if (password && downloadUrl) {
-      try {
-        // Handle both absolute and relative URLs
-        if (downloadUrl.startsWith("/")) {
-          // Relative URL - use base URL from client
-          const baseUrl = client.defaults.baseURL || window.location.origin
-          const urlObj = new URL(downloadUrl, baseUrl)
-          urlObj.searchParams.set("password", password)
-          downloadUrl = urlObj.toString()
-        } else if (downloadUrl.startsWith("http")) {
-          // Absolute URL
-          const urlObj = new URL(downloadUrl)
-          urlObj.searchParams.set("password", password)
-          downloadUrl = urlObj.toString()
-        }
-      } catch {
-        // If URL construction fails, append password as query string manually
-        const separator = downloadUrl.includes("?") ? "&" : "?"
-        downloadUrl = `${downloadUrl}${separator}password=${encodeURIComponent(password)}`
-      }
+    if (!downloadUrl) {
+      throw new Error(`No download URL found for document ${docID}`)
     }
 
-    resp = await client.get(downloadUrl, {responseType: "blob"})
-    if (resp.status !== 200) {
-      return {
-        ok: false,
-        error: `Error downloading file from ${docVer.download_url}: ${resp.status}`
-      }
-    }
-
-    return {ok: true, data: {docVerID: docVer.id, blob: resp.data}}
+    // Use downloadFromUrl to download the file (throws errors on failure)
+    return await downloadFromUrl(downloadUrl, docVer.id, password)
   } catch (error) {
+    // If it's already an Error we threw or from downloadFromUrl, re-throw it
+    if (error instanceof Error) {
+      throw error
+    }
+    
+    // Handle axios errors from the first API call
     if (axios.isAxiosError(error)) {
-      return {
-        ok: false,
-        error: `Request failed: ${error.response?.status || "Network error"} - ${error.message}`
+      if (error.response?.status === 403) {
+        // Password error - extract error message
+        const errorDetail = error.response.data
+        let errorMessage = "Password required or incorrect password"
+        
+        if (errorDetail) {
+          if (typeof errorDetail === "object" && errorDetail.detail) {
+            if (Array.isArray(errorDetail.detail) && errorDetail.detail.length > 0) {
+              errorMessage = errorDetail.detail[0]
+            } else if (typeof errorDetail.detail === "string") {
+              errorMessage = errorDetail.detail
+            }
+          } else if (typeof errorDetail === "string") {
+            errorMessage = errorDetail
+          }
+        }
+        
+        throw new Error(errorMessage)
       }
+      
+      throw new Error(`Request failed: ${error.response?.status || "Network error"} - ${error.message}`)
     }
-    return {
-      ok: false,
-      error: `Unexpected error: ${error instanceof Error ? error.message : "Unknown error"}`
-    }
+    
+    throw new Error(`Unexpected error: ${error instanceof Error ? error.message : "Unknown error"}`)
   }
 }

@@ -14,6 +14,7 @@ export default function DownloadButtonContainer() {
     docVerId: string | null
     fileName: string
   }>({opened: false, docVerId: null, fileName: ""})
+  const [passwordError, setPasswordError] = useState<string>("")
   const {currentNodeID} = useCurrentNode()
   const {versions, txt, isError, isLoading, i18nIsReady} = useDownloadButton({
     initiateListDownload: wasOpened,
@@ -27,8 +28,13 @@ export default function DownloadButtonContainer() {
   // Auto-show password prompt when 403 error occurs
   useEffect(() => {
     Object.entries(downloadErrors).forEach(([docVerId, error]) => {
-      // Check if error is password-related (403 or mentions password)
-      if (error && (error.includes("password") || error.includes("403") || error.includes("Password required"))) {
+      // Check if error is password-related (same pattern as shared documents)
+      if (error && (
+        error.includes("password") || 
+        error.includes("Password") || 
+        error.includes("403") || 
+        error.includes("Incorrect")
+      )) {
         // Only show if modal isn't already open for this docVer
         if (!passwordModal.opened || passwordModal.docVerId !== docVerId) {
           const version = versions?.find(v => v.id === docVerId)
@@ -38,7 +44,11 @@ export default function DownloadButtonContainer() {
               docVerId,
               fileName: version.fileName || `Version ${version.number}`
             })
+            setPasswordError(error) // Set error message
           }
+        } else if (passwordModal.docVerId === docVerId) {
+          // Update error if modal is already open for this docVer
+          setPasswordError(error)
         }
       }
     })
@@ -64,20 +74,38 @@ export default function DownloadButtonContainer() {
     }
   }
 
-  const handlePasswordSubmit = (password: string) => {
+  const handlePasswordSubmit = async (password: string) => {
     if (passwordModal.docVerId) {
-      // Clear any previous error for this docVer before retrying
-      // The error will be cleared automatically when the new request starts
-      dispatch(fetchAndDownloadDocument({
-        docVerId: passwordModal.docVerId,
-        password
-      }))
+      setPasswordError("") // Clear previous error
+      try {
+        await dispatch(fetchAndDownloadDocument({
+          docVerId: passwordModal.docVerId,
+          password
+        })).unwrap()
+        // Success - close modal
+        setPasswordModal({opened: false, docVerId: null, fileName: ""})
+      } catch (error) {
+        // Check if it's a password error (same pattern as shared documents)
+        const errorMessage = typeof error === "string" ? error : "Download failed"
+        if (
+          errorMessage.includes("password") || 
+          errorMessage.includes("Password") || 
+          errorMessage.includes("403") ||
+          errorMessage.includes("Incorrect")
+        ) {
+          setPasswordError(errorMessage)
+          // Keep modal open so user can try again
+        } else {
+          // Other error - close modal
+          setPasswordModal({opened: false, docVerId: null, fileName: ""})
+        }
+      }
     }
-    setPasswordModal({opened: false, docVerId: null, fileName: ""})
   }
 
   const handlePasswordModalClose = () => {
     setPasswordModal({opened: false, docVerId: null, fileName: ""})
+    setPasswordError("")
   }
 
   return (
@@ -96,6 +124,8 @@ export default function DownloadButtonContainer() {
         fileName={passwordModal.fileName}
         onClose={handlePasswordModalClose}
         onSubmit={handlePasswordSubmit}
+        error={passwordError || undefined}
+        onErrorClear={() => setPasswordError("")}
       />
     </>
   )

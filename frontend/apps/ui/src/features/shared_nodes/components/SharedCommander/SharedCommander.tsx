@@ -178,7 +178,7 @@ export default function SharedCommander() {
       </>
     )
   } else {
-    commanderContent = <Group>Empty - New !!!!</Group>
+    commanderContent = <Group>Empty</Group>
   }
 
   return (

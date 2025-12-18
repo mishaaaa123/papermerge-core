@@ -1,90 +1,32 @@
 import {useAppDispatch, useAppSelector} from "@/app/hooks"
 import useCurrentSharedDoc from "@/features/shared_nodes/hooks/useCurrentSharedDoc"
 import PasswordPromptModal from "@/features/document/components/PasswordPromptModal"
+import {downloadFromUrl} from "@/features/document/utils"
 import {UUID} from "@/types.d/common"
 import {useState, useEffect, useMemo} from "react"
 import {DownloadButton} from "viewer"
 import type {DownloadDocumentVersion, I18NDownloadButtonText} from "viewer"
 import {useTranslation} from "react-i18next"
-import axios from "@/httpClient"
-import {getBaseURL} from "@/utils"
 import {notifications} from "@mantine/notifications"
-
-function extractFilenameFromHeader(
-  contentDisposition: string | undefined
-): string | null {
-  if (!contentDisposition) return null
-  const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/)
-  if (filenameMatch && filenameMatch[1]) {
-    return filenameMatch[1].replace(/['"]/g, "")
-  }
-  return null
-}
 
 async function downloadSharedDocument(
   downloadUrl: string,
   fileName: string,
   password?: string
 ): Promise<void> {
-  let url = downloadUrl
-
-  // Add password as query parameter if provided
-  if (password) {
-    try {
-      if (url.startsWith("/")) {
-        const baseURL = getBaseURL(true) || window.location.origin
-        const urlObj = new URL(url, baseURL)
-        urlObj.searchParams.set("password", password)
-        url = urlObj.toString()
-      } else if (url.startsWith("http")) {
-        const urlObj = new URL(url)
-        urlObj.searchParams.set("password", password)
-        url = urlObj.toString()
-      }
-    } catch {
-      const separator = url.includes("?") ? "&" : "?"
-      url = `${url}${separator}password=${encodeURIComponent(password)}`
-    }
-  }
-
   try {
-    const fileResponse = await axios.get(url, {responseType: "blob"})
+    // Use unified downloadFromUrl function (throws errors instead of returning error objects)
+    const result = await downloadFromUrl(downloadUrl, "dummy-id" as UUID, password)
     
-    if (fileResponse.status === 403) {
-      // Password error
-      const errorDetail = fileResponse.data
-      let errorMessage = "Password required or incorrect password"
-      
-      if (errorDetail) {
-        if (typeof errorDetail === "object" && errorDetail.detail) {
-          if (Array.isArray(errorDetail.detail) && errorDetail.detail.length > 0) {
-            errorMessage = errorDetail.detail[0]
-          } else if (typeof errorDetail.detail === "string") {
-            errorMessage = errorDetail.detail
-          }
-        } else if (typeof errorDetail === "string") {
-          errorMessage = errorDetail
-        }
-      }
-      
-      throw new Error(errorMessage)
-    }
-    
-    if (fileResponse.status !== 200) {
-      throw new Error(`Download failed with status ${fileResponse.status}`)
-    }
-
-    // Extract filename from Content-Disposition header
-    let filename = extractFilenameFromHeader(
-      fileResponse.headers["content-disposition"]
-    ) || fileName
+    // Extract filename from Content-Disposition header (if available)
+    // Note: downloadFromUrl doesn't return headers, so we use the provided fileName
+    const filename = fileName
 
     // Get content type for proper blob creation
-    const contentType =
-      fileResponse.headers["content-type"] || "application/octet-stream"
+    const contentType = "application/pdf" // Default to PDF for document downloads
 
     // Create blob URL and trigger download
-    const blob = new Blob([fileResponse.data], {type: contentType})
+    const blob = new Blob([result.blob], {type: contentType})
     const blobUrl = window.URL.createObjectURL(blob)
 
     const anchor = document.createElement("a")
@@ -101,12 +43,24 @@ async function downloadSharedDocument(
       color: "green"
     })
   } catch (error) {
+    // Error already thrown by downloadFromUrl with proper message
+    // Don't show notification here - let the component handle it via modal
+    // Only show notification for non-password errors
     const errorMessage = error instanceof Error ? error.message : "Download failed"
-    notifications.show({
-      title: "Download Error",
-      message: errorMessage,
-      color: "red"
-    })
+    const isPasswordError = 
+      errorMessage.includes("password") || 
+      errorMessage.includes("Password") || 
+      errorMessage.includes("403") ||
+      errorMessage.includes("Incorrect")
+    
+    if (!isPasswordError) {
+      // Only show notification for non-password errors
+      notifications.show({
+        title: "Download Error",
+        message: errorMessage,
+        color: "red"
+      })
+    }
     throw error
   }
 }
@@ -249,6 +203,7 @@ export default function DownloadButtonContainer() {
         onClose={handlePasswordModalClose}
         onSubmit={handlePasswordSubmit}
         error={passwordError || undefined}
+        onErrorClear={() => setPasswordError("")}
       />
     </>
   )

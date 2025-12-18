@@ -6,8 +6,9 @@ interface Props {
   opened: boolean
   fileName: string
   onClose: () => void
-  onSubmit: (password: string) => void
+  onSubmit: (password: string) => void | Promise<void> // Can be async
   error?: string // External error message (e.g., from password validation)
+  onErrorClear?: () => void // Callback to clear external error when user types
 }
 
 export default function PasswordPromptModal({
@@ -15,29 +16,58 @@ export default function PasswordPromptModal({
   fileName,
   onClose,
   onSubmit,
-  error: externalError
+  error: externalError,
+  onErrorClear
 }: Props) {
   const {t} = useTranslation()
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
   
   // Use external error if provided, otherwise use internal error
   const displayError = externalError || error
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!password.trim()) {
       setError("Password is required")
       return
     }
+    if (isSubmitting) return // Prevent double submission
+    
     setError("")
-    onSubmit(password)
-    setPassword("")
+    if (onErrorClear) onErrorClear() // Clear external error when submitting
+    setIsSubmitting(true)
+    
+    try {
+      // onSubmit might be async, so await it
+      await onSubmit(password)
+      // Only clear password if onSubmit didn't throw (success case)
+      // If it throws, the error will be handled by the parent
+      setPassword("")
+    } catch (error) {
+      // Error is handled by parent component
+      console.error("[PasswordPromptModal] Submit error:", error)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const handleClose = () => {
+    if (isSubmitting) return // Don't allow closing while submitting
     setPassword("")
     setError("")
+    if (onErrorClear) onErrorClear() // Clear external error when closing
     onClose()
+  }
+
+  const handlePasswordChange = (value: string) => {
+    setPassword(value)
+    // Clear internal error when user types
+    setError("")
+    // Also clear external error if callback provided
+    if (onErrorClear && externalError) {
+      onErrorClear()
+    }
   }
 
   return (
@@ -57,11 +87,7 @@ export default function PasswordPromptModal({
           label="Password"
           placeholder="Enter password"
           value={password}
-          onChange={(e) => {
-            setPassword(e.currentTarget.value)
-            // Clear internal error when user types, but external error should be cleared by parent
-            setError("")
-          }}
+          onChange={(e) => handlePasswordChange(e.currentTarget.value)}
           error={displayError}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
@@ -71,10 +97,10 @@ export default function PasswordPromptModal({
           autoFocus
         />
         <Group justify="flex-end" gap="sm" mt="md">
-          <Button variant="default" onClick={handleClose}>
+          <Button variant="default" onClick={handleClose} disabled={isSubmitting}>
             {t("common.cancel")}
           </Button>
-          <Button onClick={handleSubmit}>
+          <Button onClick={handleSubmit} loading={isSubmitting}>
             {t("common.submit")}
           </Button>
         </Group>

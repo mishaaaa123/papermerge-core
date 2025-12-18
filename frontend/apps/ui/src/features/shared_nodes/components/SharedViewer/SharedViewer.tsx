@@ -122,20 +122,37 @@ export default function SharedViewer() {
   })
 
   /* generate first batch of previews: for pages and for their thumbnails */
-  const allPreviewsAreAvailable = useGeneratePreviews({
+  const {allPreviewsAreAvailable, passwordError: previewPasswordError} = useGeneratePreviews({
     docVer: docVer,
     pageNumber: 1,
     pageSize: DOC_VER_PAGINATION_PAGE_BATCH_SIZE,
     imageSize: "md",
     downloadUrl: downloadUrl, // Pass download_url for shared documents
     password: password || undefined, // Pass password for password-protected documents
-    onPasswordError: (error: string) => {
-      // Callback when password error occurs (wrong password)
-      console.log("[SharedViewer] Password error detected:", error)
-      setPasswordError(error)
-      setPassword(null) // Clear password so user can try again - this will make needsPassword=true, showing modal again
-    }
   })
+
+  // Handle password errors from useGeneratePreviews (same pattern as download)
+  useEffect(() => {
+    if (previewPasswordError) {
+      const errorMessage = previewPasswordError
+      console.log("[SharedViewer] Password error detected:", errorMessage)
+      
+      // Check if it's a password error (same pattern as download)
+      if (
+        errorMessage.includes("password") || 
+        errorMessage.includes("Password") || 
+        errorMessage.includes("403") || 
+        errorMessage.includes("Incorrect")
+      ) {
+        setPasswordError(errorMessage)
+        setPassword(null) // Clear password so user can try again - this will make needsPassword=true, showing modal again
+      } else {
+        // Other error - still show it but don't clear password (might be network error, etc.)
+        setPasswordError(errorMessage)
+        // Don't clear password for non-password errors, user might want to retry with same password
+      }
+    }
+  }, [previewPasswordError])
 
   const lastPageSize = useAppSelector(s => selectLastPageSize(s, mode))
   const currentNodeID = useAppSelector(selectCurrentSharedNodeID)
@@ -206,10 +223,8 @@ export default function SharedViewer() {
           onClose={handlePasswordModalClose}
           onSubmit={handlePasswordSubmit}
           error={passwordError || undefined}
+          onErrorClear={() => setPasswordError("")}
         />
-        {passwordError && (
-          <div style={{color: "red", marginTop: "10px", textAlign: "center"}}>{passwordError}</div>
-        )}
       </div>
     )
   }

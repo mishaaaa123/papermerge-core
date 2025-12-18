@@ -93,7 +93,7 @@ export function Viewer({doc, docVer}: Args) {
   }, [docVer?.is_password_protected, password, passwordModalOpened, openPasswordModal])
   
   // Always call the hook to respect React's rules of hooks; for videos we simply ignore its result.
-  const previewsReady = useGeneratePreviews({
+  const {allPreviewsAreAvailable: previewsReady, passwordError: previewPasswordError} = useGeneratePreviews({
     docVer: docVer,
     pageNumber: 1,
     pageSize: DOC_VER_PAGINATION_PAGE_BATCH_SIZE,
@@ -101,6 +101,34 @@ export function Viewer({doc, docVer}: Args) {
     password: password || undefined
   })
   const allPreviewsAreAvailable = isVideoDoc ? true : previewsReady
+
+  // Handle password errors from useGeneratePreviews (same pattern as download/shared viewer)
+  useEffect(() => {
+    if (previewPasswordError) {
+      const errorMessage = previewPasswordError
+      console.log("[Viewer] Password error detected:", errorMessage)
+
+      if (
+        errorMessage.includes("password") ||
+        errorMessage.includes("Password") ||
+        errorMessage.includes("403") ||
+        errorMessage.includes("Incorrect")
+      ) {
+        // Treat as password error
+        setPasswordError(errorMessage)
+        setPassword(null)
+
+        // Ensure password modal is open so user can retry
+        if (!passwordModalOpened) {
+          openPasswordModal()
+        }
+      } else {
+        // Non-password error (network, etc.) - show but keep password
+        setPasswordError(errorMessage)
+      }
+    }
+  }, [previewPasswordError, passwordModalOpened, openPasswordModal])
+
   const selectedPages = useSelectedPages({mode, docVerID: docVer?.id})
 
   const {
@@ -248,10 +276,9 @@ export function Viewer({doc, docVer}: Args) {
           fileName={docVer?.file_name || "document"}
           onClose={handlePasswordModalClose}
           onSubmit={handlePasswordSubmit}
+          error={passwordError || undefined}
+          onErrorClear={() => setPasswordError("")}
         />
-        {passwordError && (
-          <div style={{color: "red", marginTop: "10px", textAlign: "center"}}>{passwordError}</div>
-        )}
       </div>
     )
   }

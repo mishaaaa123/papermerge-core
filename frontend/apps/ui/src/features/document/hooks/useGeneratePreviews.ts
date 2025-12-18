@@ -6,7 +6,7 @@ import {fileManager} from "@/features/files/fileManager"
 import {ClientDocumentVersion} from "@/types"
 import {ImageSize} from "@/types.d/common"
 import {UUID} from "@/types.d/common"
-import {useEffect} from "react"
+import {useEffect, useState} from "react"
 
 interface Args {
   docVer?: ClientDocumentVersion
@@ -15,7 +15,11 @@ interface Args {
   imageSize: ImageSize
   password?: string
   downloadUrl?: string // For shared documents - download URL from version
-  onPasswordError?: (error: string) => void // Callback for password errors
+}
+
+interface ReturnType {
+  allPreviewsAreAvailable: boolean
+  passwordError: string | null
 }
 
 export default function useGeneratePreviews({
@@ -24,10 +28,10 @@ export default function useGeneratePreviews({
   pageNumber,
   imageSize,
   password,
-  downloadUrl,
-  onPasswordError
-}: Args): boolean {
+  downloadUrl
+}: Args): ReturnType {
   const dispatch = useAppDispatch()
+  const [passwordError, setPasswordError] = useState<string | null>(null)
   const allPreviewsAreAvailable = useAreAllPreviewsAvailable({
     docVer,
     pageSize,
@@ -41,6 +45,9 @@ export default function useGeneratePreviews({
         console.log("[useGeneratePreviews] No docVer, skipping")
         return
       }
+
+      // Clear previous errors when starting new download
+      setPasswordError(null)
 
       console.log("[useGeneratePreviews] Checking previews:", {
         docVerID: docVer.id,
@@ -63,42 +70,38 @@ export default function useGeneratePreviews({
         if (!fileManager.getByDocVerID(docVer.id)) {
           console.log("[useGeneratePreviews] PDF not in cache, downloading...")
           
-          let result: {ok: boolean; data?: {docVerID: UUID; blob: Blob}; error?: string}
-          
-          // For shared documents, use the downloadUrl directly
-          if (downloadUrl) {
-            console.log("[useGeneratePreviews] Using downloadUrl for shared document:", downloadUrl)
-            result = await downloadFromUrl(downloadUrl, docVer.id, password)
-          } else {
-            // For regular documents, use the standard endpoint
-            result = await getDocLastVersion(docVer.document_id, password)
-          }
-          
-          console.log("[useGeneratePreviews] Download result:", {
-            ok: result.ok,
-            hasData: !!result.data,
-            error: result.error,
-            docVerID: result.data?.docVerID
-          })
-          
-          if (result.ok && result.data) {
-            const arrayBuffer = await result.data.blob.arrayBuffer()
-            fileManager.store({
-              buffer: arrayBuffer,
-              docVerID: result.data.docVerID
-            })
-            console.log("[useGeneratePreviews] PDF stored in cache")
-          } else {
-            const errorMsg = result.error || "Unknown download error"
-            console.error("[useGeneratePreviews] Download error:", errorMsg)
+          try {
+            let result: {docVerID: UUID; blob: Blob}
             
-            // If it's a password error, notify the parent component
-            if (result.isPasswordError && onPasswordError) {
-              console.log("[useGeneratePreviews] Calling onPasswordError callback")
-              onPasswordError(errorMsg)
+            // For shared documents, use the downloadUrl directly
+            if (downloadUrl) {
+              console.log("[useGeneratePreviews] Using downloadUrl for shared document:", downloadUrl)
+              result = await downloadFromUrl(downloadUrl, docVer.id, password)
+            } else {
+              // For regular documents, use the standard endpoint
+              // getDocLastVersion now throws errors (same pattern as downloadFromUrl)
+              console.log("[useGeneratePreviews] Using getDocLastVersion for regular document:", docVer.document_id)
+              result = await getDocLastVersion(docVer.document_id, password)
             }
             
-            // For all errors, just return (don't try to generate previews)
+            console.log("[useGeneratePreviews] Download result:", {
+              hasData: !!result,
+              docVerID: result.docVerID
+            })
+            
+            // Store PDF in cache
+            const arrayBuffer = await result.blob.arrayBuffer()
+            fileManager.store({
+              buffer: arrayBuffer,
+              docVerID: result.docVerID
+            })
+            console.log("[useGeneratePreviews] PDF stored in cache")
+          } catch (error) {
+            // Catch error and store message (same pattern as download)
+            const errorMessage = error instanceof Error ? error.message : "Unknown error"
+            console.error("[useGeneratePreviews] Download error:", errorMessage)
+            setPasswordError(errorMessage)
+            // Don't try to generate previews on error
             return
           }
         } else {
@@ -122,7 +125,7 @@ export default function useGeneratePreviews({
     }
 
     generate()
-  }, [dispatch, docVer, pageSize, pageNumber, allPreviewsAreAvailable, password, downloadUrl, onPasswordError])
+  }, [dispatch, docVer, pageSize, pageNumber, allPreviewsAreAvailable, password, downloadUrl])
 
-  return allPreviewsAreAvailable
+  return {allPreviewsAreAvailable, passwordError}
 }
