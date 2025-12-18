@@ -56,6 +56,16 @@ export function getErrorMessage(
   t: TFunction,
   context?: string
 ): string {
+  // Handle plain string errors (from rejectWithValue)
+  if (typeof error === "string") {
+    return error
+  }
+
+  // Handle Error instances
+  if (error instanceof Error) {
+    return error.message
+  }
+
   // Handle RTK Query FetchBaseQueryError
   if (isFetchBaseQueryError(error)) {
     // Network errors

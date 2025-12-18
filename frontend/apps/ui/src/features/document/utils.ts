@@ -79,18 +79,6 @@ export async function rotateImageObjectURL(
   })
 }
 
-interface DocData {
-  blob: Blob
-  docVerID: UUID
-}
-
-interface ClientReturn {
-  ok: boolean
-  error?: string
-  data?: DocData
-  isPasswordError?: boolean
-}
-
 // Return type for downloadFromUrl - throws errors instead of returning error objects
 interface DownloadResult {
   docVerID: UUID

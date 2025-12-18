@@ -24,6 +24,36 @@ interface RTKQueryAction extends Action {
 export const rtkQueryErrorLogger: Middleware = () => next => action => {
   // Check if this is a rejected action from RTK Query
   if (isRejectedWithValue(action)) {
+    // Extract error message from payload (could be string, Error, or FetchBaseQueryError)
+    let errorMessageStr = ""
+    if (typeof action.payload === "string") {
+      errorMessageStr = action.payload
+    } else if (action.payload instanceof Error) {
+      errorMessageStr = action.payload.message
+    } else if (typeof action.payload === "object" && action.payload !== null) {
+      // For FetchBaseQueryError or other structured errors, extract message
+      const payload = action.payload as any
+      if (payload.message) {
+        errorMessageStr = payload.message
+      } else if (payload.data?.detail) {
+        errorMessageStr = typeof payload.data.detail === "string" 
+          ? payload.data.detail 
+          : JSON.stringify(payload.data.detail)
+      }
+    }
+
+    // Skip password errors - they are handled by password modals
+    const isPasswordError = 
+      errorMessageStr.includes("password") || 
+      errorMessageStr.includes("Password") || 
+      errorMessageStr.includes("403") ||
+      errorMessageStr.includes("Incorrect")
+    
+    if (isPasswordError) {
+      // Don't show notification for password errors - handled by password modal
+      return next(action)
+    }
+
     // Extract endpoint name and operation type from the action
     const endpointName = (action as RTKQueryAction).meta?.arg?.endpointName
     const operationType = extractOperationType(endpointName)

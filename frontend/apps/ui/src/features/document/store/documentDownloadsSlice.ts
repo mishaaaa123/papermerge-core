@@ -63,7 +63,7 @@ export const fetchAndDownloadDocument = createAsyncThunk<
       const result = await downloadFromUrl(url, docVerId as UUID, password)
 
       // Extract filename from Redux state or default
-      const docVer = state.docVers.entities[docVerId]
+        const docVer = state.docVers.entities[docVerId]
       const filename = docVer?.file_name || `document-${docVerId}.pdf`
 
       // Get content type for proper blob creation
@@ -89,22 +89,22 @@ export const fetchAndDownloadDocument = createAsyncThunk<
         errorMessage = err.message
       } else {
         // Handle other error types (e.g., from getting download URL)
-        const axiosError = err as AxiosError<{detail?: string}>
-        
-        if (axiosError?.response) {
-          if (axiosError.response.status === 429) {
-            errorMessage =
-              axiosError.response.data?.detail ||
-              "You've reached the download rate limit. Please try again in a moment."
-          } else {
-            errorMessage =
-              axiosError.response.data?.detail ||
-              axiosError.message ||
-              "Download failed"
-          }
-        } else if (axiosError?.message) {
-          errorMessage = axiosError.message
+      const axiosError = err as AxiosError<{detail?: string}>
+
+      if (axiosError?.response) {
+        if (axiosError.response.status === 429) {
+          errorMessage =
+            axiosError.response.data?.detail ||
+            "You've reached the download rate limit. Please try again in a moment."
+        } else {
+          errorMessage =
+            axiosError.response.data?.detail ||
+            axiosError.message ||
+            "Download failed"
         }
+      } else if (axiosError?.message) {
+        errorMessage = axiosError.message
+      }
       }
 
       // Only show notification for non-password errors
@@ -116,11 +116,11 @@ export const fetchAndDownloadDocument = createAsyncThunk<
         errorMessage.includes("Incorrect")
       
       if (!isPasswordError) {
-        notifications.show({
-          color: "red",
-          title: "Download blocked",
-          message: errorMessage
-        })
+      notifications.show({
+        color: "red",
+        title: "Download blocked",
+        message: errorMessage
+      })
       }
 
       return rejectWithValue(errorMessage)
@@ -162,35 +162,5 @@ const documentDownloadsSlice = createSlice({
 })
 
 // Helper function to extract filename from Content-Disposition header
-function extractFilenameFromHeader(
-  contentDisposition: string | undefined
-): string | null {
-  if (!contentDisposition) return null
-
-  // Try to match filename*=UTF-8''encoded_filename first (for unicode filenames)
-  const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/)
-  if (utf8Match) {
-    try {
-      return decodeURIComponent(utf8Match[1])
-    } catch {
-      // If decoding fails, continue to ASCII filename
-    }
-  }
-
-  // Try to match filename="ascii_filename"
-  const asciiMatch = contentDisposition.match(/filename="([^"]+)"/)
-  if (asciiMatch) {
-    return asciiMatch[1]
-  }
-
-  // Try to match filename=unquoted_filename
-  const unquotedMatch = contentDisposition.match(/filename=([^;]+)/)
-  if (unquotedMatch) {
-    return unquotedMatch[1].trim()
-  }
-
-  return null
-}
-
 export default documentDownloadsSlice.reducer
 export type {DocumentState}
