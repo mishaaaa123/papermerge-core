@@ -53,7 +53,8 @@ export default function PasswordPromptModal({
   }
 
   const handleClose = () => {
-    if (isSubmitting) return // Don't allow closing while submitting
+    // Allow closing even during submission (downloads can continue in background)
+    // Only prevent closing if we want to block it (e.g., for viewing documents)
     setPassword("")
     setError("")
     if (onErrorClear) onErrorClear() // Clear external error when closing
@@ -97,7 +98,7 @@ export default function PasswordPromptModal({
           autoFocus
         />
         <Group justify="flex-end" gap="sm" mt="md">
-          <Button variant="default" onClick={handleClose} disabled={isSubmitting}>
+          <Button variant="default" onClick={handleClose}>
             {t("common.cancel")}
           </Button>
           <Button onClick={handleSubmit} loading={isSubmitting}>
