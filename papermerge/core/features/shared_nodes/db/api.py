@@ -433,6 +433,16 @@ async def get_shared_doc(
     # colored_tags = session.scalars(colored_tags_stmt).all()
     # db_doc.tags = [ct.tag for ct in colored_tags]
 
+    # Debug: Check if password protection is loaded
+    if db_doc.versions:
+        for ver in db_doc.versions:
+            logger.info(f"[get_shared_doc] ORM version {ver.id}: is_password_protected={ver.is_password_protected}, type={type(ver.is_password_protected)}")
+
     model_doc = schema.Document.model_validate(db_doc)
+
+    # Debug: Check if password protection is in the model
+    if model_doc.versions:
+        for ver in model_doc.versions:
+            logger.info(f"[get_shared_doc] Pydantic version {ver.id}: is_password_protected={ver.is_password_protected}, type={type(ver.is_password_protected)}")
 
     return model_doc

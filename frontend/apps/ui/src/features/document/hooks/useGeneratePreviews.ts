@@ -15,6 +15,7 @@ interface Args {
   imageSize: ImageSize
   password?: string
   downloadUrl?: string // For shared documents - download URL from version
+  onPasswordError?: (error: string) => void // Callback for password errors
 }
 
 export default function useGeneratePreviews({
@@ -23,7 +24,8 @@ export default function useGeneratePreviews({
   pageNumber,
   imageSize,
   password,
-  downloadUrl
+  downloadUrl,
+  onPasswordError
 }: Args): boolean {
   const dispatch = useAppDispatch()
   const allPreviewsAreAvailable = useAreAllPreviewsAvailable({
@@ -89,8 +91,14 @@ export default function useGeneratePreviews({
           } else {
             const errorMsg = result.error || "Unknown download error"
             console.error("[useGeneratePreviews] Download error:", errorMsg)
-            // If it's a password error, we'll handle it in Viewer component
-            // by checking docVer.is_password_protected
+            
+            // If it's a password error, notify the parent component
+            if (result.isPasswordError && onPasswordError) {
+              console.log("[useGeneratePreviews] Calling onPasswordError callback")
+              onPasswordError(errorMsg)
+            }
+            
+            // For all errors, just return (don't try to generate previews)
             return
           }
         } else {
@@ -114,7 +122,7 @@ export default function useGeneratePreviews({
     }
 
     generate()
-  }, [dispatch, docVer, pageSize, pageNumber, allPreviewsAreAvailable, password, downloadUrl])
+  }, [dispatch, docVer, pageSize, pageNumber, allPreviewsAreAvailable, password, downloadUrl, onPasswordError])
 
   return allPreviewsAreAvailable
 }

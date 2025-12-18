@@ -212,7 +212,8 @@ const docVersSlice = createSlice({
             thumbnailsPagination: {
               page_number: 1,
               per_page: DOC_VER_PAGINATION_THUMBNAIL_BATCH_SIZE
-            }
+            },
+            is_password_protected: v.is_password_protected || false
           }
           all_vers.push(ver)
         })

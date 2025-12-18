@@ -88,6 +88,7 @@ interface ClientReturn {
   ok: boolean
   error?: string
   data?: DocData
+  isPasswordError?: boolean
 }
 
 export async function downloadFromUrl(
@@ -132,6 +133,31 @@ export async function downloadFromUrl(
     return {ok: true, data: {docVerID: docVerID, blob: resp.data}}
   } catch (error) {
     if (axios.isAxiosError(error)) {
+      // Check for password-related errors (403 status)
+      if (error.response?.status === 403) {
+        const errorDetail = error.response.data
+        let errorMessage = "Password required or incorrect password"
+        
+        // Try to extract error message from response
+        if (errorDetail) {
+          if (typeof errorDetail === "object" && errorDetail.detail) {
+            if (Array.isArray(errorDetail.detail) && errorDetail.detail.length > 0) {
+              errorMessage = errorDetail.detail[0]
+            } else if (typeof errorDetail.detail === "string") {
+              errorMessage = errorDetail.detail
+            }
+          } else if (typeof errorDetail === "string") {
+            errorMessage = errorDetail
+          }
+        }
+        
+        return {
+          ok: false,
+          error: errorMessage,
+          isPasswordError: true
+        }
+      }
+      
       return {
         ok: false,
         error: `Request failed: ${error.response?.status || "Network error"} - ${error.message}`

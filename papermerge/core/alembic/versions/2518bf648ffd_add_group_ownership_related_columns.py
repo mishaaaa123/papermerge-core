@@ -33,28 +33,28 @@ def upgrade() -> None:
     
     # custom fields
     if not column_exists("custom_fields", "group_id"):
-    op.add_column("custom_fields", sa.Column("group_id", sa.Uuid(), nullable=True))
+        op.add_column("custom_fields", sa.Column("group_id", sa.Uuid(), nullable=True))
     with op.batch_alter_table("custom_fields") as batch_op:
         batch_op.alter_column("user_id", existing_type=sa.UUID(), nullable=True)
 
     # SQLite doesn't support adding foreign keys or check constraints via ALTER TABLE
     if not is_sqlite:
-    op.create_foreign_key(
-        "custom_fields_group_id_fkey",
-        "custom_fields",
-        "groups",
-        ["group_id"],
-        ["id"],
-    )
-    op.create_check_constraint(
-        constraint_name="check__user_id_not_null__or__group_id_not_null",
-        table_name="custom_fields",
-        condition="user_id IS NOT NULL OR group_id IS NOT NULL",
-    )
+        op.create_foreign_key(
+            "custom_fields_group_id_fkey",
+            "custom_fields",
+            "groups",
+            ["group_id"],
+            ["id"],
+        )
+        op.create_check_constraint(
+            constraint_name="check__user_id_not_null__or__group_id_not_null",
+            table_name="custom_fields",
+            condition="user_id IS NOT NULL OR group_id IS NOT NULL",
+        )
 
     # document types
     if not column_exists("document_types", "group_id"):
-    op.add_column("document_types", sa.Column("group_id", sa.Uuid(), nullable=True))
+        op.add_column("document_types", sa.Column("group_id", sa.Uuid(), nullable=True))
 
     with op.batch_alter_table("document_types") as batch_op:
         batch_op.alter_column("user_id", existing_type=sa.UUID(), nullable=True)
@@ -73,60 +73,59 @@ def upgrade() -> None:
             )
     
     if not is_sqlite:
-    op.drop_constraint(
-        "unique document type per user", "document_types", type_="unique"
-    )
-    op.create_unique_constraint(
-        "unique document type per user",
-        "document_types",
-        ["name", "user_id"],
-    )
-    op.create_unique_constraint(
-        "unique document type per group",
-        "document_types",
-        ["name", "group_id"],
-    )
-    if not is_sqlite:
-    op.create_foreign_key(
-        "document_types_group_id_fkey",
-        "document_types",
-        "groups",
-        ["group_id"],
-        ["id"],
-    )
-    op.create_check_constraint(
-        constraint_name="check__user_id_not_null__or__group_id_not_null",
-        table_name="document_types",
-        condition="user_id IS NOT NULL OR group_id IS NOT NULL",
-    )
+        op.drop_constraint(
+            "unique document type per user", "document_types", type_="unique"
+        )
+        op.create_unique_constraint(
+            "unique document type per user",
+            "document_types",
+            ["name", "user_id"],
+        )
+        op.create_unique_constraint(
+            "unique document type per group",
+            "document_types",
+            ["name", "group_id"],
+        )
+        op.create_foreign_key(
+            "document_types_group_id_fkey",
+            "document_types",
+            "groups",
+            ["group_id"],
+            ["id"],
+        )
+        op.create_check_constraint(
+            constraint_name="check__user_id_not_null__or__group_id_not_null",
+            table_name="document_types",
+            condition="user_id IS NOT NULL OR group_id IS NOT NULL",
+        )
     #### groups
     if not column_exists("groups", "home_folder_id"):
-    op.add_column("groups", sa.Column("home_folder_id", sa.Uuid(), nullable=True))
+        op.add_column("groups", sa.Column("home_folder_id", sa.Uuid(), nullable=True))
     if not column_exists("groups", "inbox_folder_id"):
-    op.add_column("groups", sa.Column("inbox_folder_id", sa.Uuid(), nullable=True))
+        op.add_column("groups", sa.Column("inbox_folder_id", sa.Uuid(), nullable=True))
 
     if not is_sqlite:
-    op.create_foreign_key(
-        "groups_inbox_folder_id_fkey",
-        "groups",
-        "folders",
-        ["inbox_folder_id"],
-        ["node_id"],
-        ondelete="CASCADE",
-        deferrable=True,
-    )
-    op.create_foreign_key(
-        "groups_home_folder_id_fkey",
-        "groups",
-        "folders",
-        ["home_folder_id"],
-        ["node_id"],
-        ondelete="CASCADE",
-        deferrable=True,
-    )
+        op.create_foreign_key(
+            "groups_inbox_folder_id_fkey",
+            "groups",
+            "folders",
+            ["inbox_folder_id"],
+            ["node_id"],
+            ondelete="CASCADE",
+            deferrable=True,
+        )
+        op.create_foreign_key(
+            "groups_home_folder_id_fkey",
+            "groups",
+            "folders",
+            ["home_folder_id"],
+            ["node_id"],
+            ondelete="CASCADE",
+            deferrable=True,
+        )
     ### nodes
     if not column_exists("nodes", "group_id"):
-    op.add_column("nodes", sa.Column("group_id", sa.Uuid(), nullable=True))
+        op.add_column("nodes", sa.Column("group_id", sa.Uuid(), nullable=True))
 
     with op.batch_alter_table("nodes") as batch_op:
         batch_op.alter_column("user_id", existing_type=sa.UUID(), nullable=True)
@@ -145,36 +144,35 @@ def upgrade() -> None:
             )
     
     if not is_sqlite:
-    op.drop_constraint("unique title per parent per user", "nodes", type_="unique")
-    op.create_unique_constraint(
-        "unique title per parent per user",
-        "nodes",
-        ["parent_id", "title", "user_id"],
-    )
-    op.create_unique_constraint(
-        "unique title per parent per group",
-        "nodes",
-        ["parent_id", "title", "group_id"],
-    )
-    if not is_sqlite:
-    op.create_foreign_key(
-        "nodes_group_id_fkey",
-        "nodes",
-        "groups",
-        ["group_id"],
-        ["id"],
-        ondelete="CASCADE",
-        use_alter=True,
-    )
-    op.create_check_constraint(
-        constraint_name="check__user_id_not_null__or__group_id_not_null",
-        table_name="nodes",
-        condition="user_id IS NOT NULL OR group_id IS NOT NULL",
-    )
+        op.drop_constraint("unique title per parent per user", "nodes", type_="unique")
+        op.create_unique_constraint(
+            "unique title per parent per user",
+            "nodes",
+            ["parent_id", "title", "user_id"],
+        )
+        op.create_unique_constraint(
+            "unique title per parent per group",
+            "nodes",
+            ["parent_id", "title", "group_id"],
+        )
+        op.create_foreign_key(
+            "nodes_group_id_fkey",
+            "nodes",
+            "groups",
+            ["group_id"],
+            ["id"],
+            ondelete="CASCADE",
+            use_alter=True,
+        )
+        op.create_check_constraint(
+            constraint_name="check__user_id_not_null__or__group_id_not_null",
+            table_name="nodes",
+            condition="user_id IS NOT NULL OR group_id IS NOT NULL",
+        )
 
     # tags
     if not column_exists("tags", "group_id"):
-    op.add_column("tags", sa.Column("group_id", sa.Uuid(), nullable=True))
+        op.add_column("tags", sa.Column("group_id", sa.Uuid(), nullable=True))
 
     with op.batch_alter_table("tags") as batch_op:
         batch_op.alter_column("user_id", existing_type=sa.UUID(), nullable=True)

@@ -7,17 +7,22 @@ interface Props {
   fileName: string
   onClose: () => void
   onSubmit: (password: string) => void
+  error?: string // External error message (e.g., from password validation)
 }
 
 export default function PasswordPromptModal({
   opened,
   fileName,
   onClose,
-  onSubmit
+  onSubmit,
+  error: externalError
 }: Props) {
   const {t} = useTranslation()
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
+  
+  // Use external error if provided, otherwise use internal error
+  const displayError = externalError || error
 
   const handleSubmit = () => {
     if (!password.trim()) {
@@ -54,9 +59,10 @@ export default function PasswordPromptModal({
           value={password}
           onChange={(e) => {
             setPassword(e.currentTarget.value)
+            // Clear internal error when user types, but external error should be cleared by parent
             setError("")
           }}
-          error={error}
+          error={displayError}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               handleSubmit()

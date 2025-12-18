@@ -155,22 +155,22 @@ export const generatePreviews = createAsyncThunk<
     console.log(`[generatePreviews thunk] Generating preview for page ${page.number} (pageID: ${page.id})`)
     
     try {
-      const objectURL = await util_pdf_generatePreview({
-        file: file,
-        width,
-        pageNumber: page.number
-      })
+    const objectURL = await util_pdf_generatePreview({
+      file: file,
+      width,
+      pageNumber: page.number
+    })
 
-      if (objectURL) {
+    if (objectURL) {
         console.log(`[generatePreviews thunk] Preview generated for page ${page.number}:`, objectURL.substring(0, 50))
-        result.items.push({
-          pageID: page.id,
-          docID: item.docVer.document_id,
-          docVerID: item.docVer.id,
-          pageNumber: page.number,
-          objectURL: objectURL,
-          size: item.size
-        })
+      result.items.push({
+        pageID: page.id,
+        docID: item.docVer.document_id,
+        docVerID: item.docVer.id,
+        pageNumber: page.number,
+        objectURL: objectURL,
+        size: item.size
+      })
       } else {
         console.error(`[generatePreviews thunk] No objectURL returned for page ${page.number}`)
       }

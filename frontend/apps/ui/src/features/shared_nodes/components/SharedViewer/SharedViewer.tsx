@@ -1,7 +1,7 @@
 import {useAppDispatch, useAppSelector} from "@/app/hooks"
 
 import {Flex, Group, Loader} from "@mantine/core"
-import {useContext, useRef, useMemo} from "react"
+import {useContext, useRef, useMemo, useState, useEffect} from "react"
 import {useNavigate} from "react-router-dom"
 
 import {
@@ -22,6 +22,8 @@ import ThumbnailsToggle from "@/components/document/ThumbnailsToggle"
 import classes from "@/components/document/Viewer.module.css"
 import {DOC_VER_PAGINATION_PAGE_BATCH_SIZE} from "@/features/document/constants"
 import useGeneratePreviews from "@/features/document/hooks/useGeneratePreviews"
+import PasswordPromptModal from "@/features/document/components/PasswordPromptModal"
+import {fileManager} from "@/features/files/fileManager"
 import PageList from "./PageList"
 import ThumbnailList from "./ThumbnailList"
 
@@ -41,6 +43,54 @@ export default function SharedViewer() {
   const mode: PanelMode = useContext(PanelContext)
   const navigate = useNavigate()
   const dispatch = useAppDispatch()
+
+  // Password state for viewing password-protected documents
+  // password: The password entered by the user (misha) - null if not entered yet
+  const [password, setPassword] = useState<string | null>(null)
+  const [passwordError, setPasswordError] = useState<string>("")
+  
+  // Document password protection status (from backend - set by admin)
+  const isDocumentPasswordProtected = docVer?.is_password_protected || false
+  
+  // Whether the user has entered a password (frontend state)
+  const hasUserEnteredPassword = !!password
+  
+  // Check if document is password-protected AND user hasn't entered password yet
+  const needsPassword = isDocumentPasswordProtected && !hasUserEnteredPassword
+  
+  // Debug logging
+  useEffect(() => {
+    console.log("[SharedViewer] Password protection check:", {
+      hasDocVer: !!docVer,
+      docVerID: docVer?.id,
+      isDocumentPasswordProtected: isDocumentPasswordProtected, // Document requires password (set by admin)
+      hasUserEnteredPassword: hasUserEnteredPassword, // User (misha) has entered password
+      needsPassword: needsPassword // Document is protected AND user hasn't entered password
+    })
+  }, [docVer?.id, isDocumentPasswordProtected, hasUserEnteredPassword, needsPassword])
+  
+  // Track the last document ID to detect document changes
+  const [lastDocVerId, setLastDocVerId] = useState<string | null>(null)
+  
+  // Clear password and cache when document changes
+  useEffect(() => {
+    if (docVer?.id && lastDocVerId !== docVer.id) {
+      // Clear password state when document changes
+      setPassword(null)
+      setPasswordError("")
+      
+      // Clear cached PDF for password-protected documents to force re-authentication
+      if (isDocumentPasswordProtected) {
+        const deletedCount = fileManager.deleteByDocVerID(docVer.id)
+        if (deletedCount > 0) {
+          console.log("[SharedViewer] Cleared cached PDF for password-protected document:", docVer.id)
+        }
+      }
+      
+      setLastDocVerId(docVer.id)
+    }
+  }, [docVer?.id, docVer?.is_password_protected, lastDocVerId, isDocumentPasswordProtected])
+  
 
   // Get download_url from the last version for shared documents
   const downloadUrl = useMemo(() => {
@@ -77,7 +127,14 @@ export default function SharedViewer() {
     pageNumber: 1,
     pageSize: DOC_VER_PAGINATION_PAGE_BATCH_SIZE,
     imageSize: "md",
-    downloadUrl: downloadUrl // Pass download_url for shared documents
+    downloadUrl: downloadUrl, // Pass download_url for shared documents
+    password: password || undefined, // Pass password for password-protected documents
+    onPasswordError: (error: string) => {
+      // Callback when password error occurs (wrong password)
+      console.log("[SharedViewer] Password error detected:", error)
+      setPasswordError(error)
+      setPassword(null) // Clear password so user can try again - this will make needsPassword=true, showing modal again
+    }
   })
 
   const lastPageSize = useAppSelector(s => selectLastPageSize(s, mode))
@@ -114,12 +171,47 @@ export default function SharedViewer() {
   }, [isSuccess, doc])
   console.log(`shared viewer ${doc}`)
   */
+  const handlePasswordSubmit = (enteredPassword: string) => {
+    // Clear any previous errors when submitting new password
+    setPasswordError("")
+    setPassword(enteredPassword)
+    // When password is set, needsPassword becomes false, so modal will close automatically
+  }
+
+  const handlePasswordModalClose = () => {
+    // Don't allow closing without password for protected documents
+    if (needsPassword) {
+      setPasswordError("Password is required to view this document")
+      // Modal stays open because needsPassword is still true
+      return
+    }
+    // If needsPassword is false, modal won't be rendered anyway
+  }
+
   if (!doc) {
     return <Loader />
   }
 
   if (!docVer) {
     return <Loader />
+  }
+
+  // Show password modal if document is password-protected
+  if (needsPassword) {
+    return (
+      <div style={{display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", height: "100%", padding: "20px"}}>
+        <PasswordPromptModal
+          opened={true}  // Force open when needsPassword is true
+          fileName={docVer?.file_name || "document"}
+          onClose={handlePasswordModalClose}
+          onSubmit={handlePasswordSubmit}
+          error={passwordError || undefined}
+        />
+        {passwordError && (
+          <div style={{color: "red", marginTop: "10px", textAlign: "center"}}>{passwordError}</div>
+        )}
+      </div>
+    )
   }
 
   if (!allPreviewsAreAvailable) {
