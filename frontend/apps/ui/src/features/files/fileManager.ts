@@ -4,6 +4,7 @@ type FileItem = {
   nodeID?: UUID
   buffer: ArrayBuffer
   docVerID?: UUID
+  passwordHash?: string // SHA-256 hash of the password used to decrypt this file
 }
 
 class FileManager {
@@ -30,6 +31,36 @@ class FileManager {
 
   getByDocVerID(docVerID: UUID): FileItem | undefined {
     return this.files.find(file => file.docVerID === docVerID)
+  }
+
+  /**
+   * Validates that the provided password matches the password hash stored with the cached file.
+   * Returns true if password matches or if file is not password-protected.
+   * Returns false if password doesn't match.
+   */
+  async validatePassword(docVerID: UUID, password: string | undefined): Promise<boolean> {
+    const fileItem = this.getByDocVerID(docVerID)
+    
+    // If file is not in cache, validation passes (will be downloaded)
+    if (!fileItem) {
+      return true
+    }
+    
+    // If file has no password hash, it's not password-protected
+    if (!fileItem.passwordHash) {
+      return true
+    }
+    
+    // If file is password-protected but no password provided, validation fails
+    if (!password) {
+      return false
+    }
+    
+    // Hash the provided password and compare with stored hash
+    const { hashPassword } = await import("@/utils/passwordHash")
+    const providedHash = await hashPassword(password)
+    
+    return providedHash === fileItem.passwordHash
   }
 
   update(nodeID: UUID, updates: Partial<Omit<FileItem, "nodeID">>): boolean {

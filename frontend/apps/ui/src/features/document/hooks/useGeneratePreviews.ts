@@ -3,6 +3,7 @@ import useAreAllPreviewsAvailable from "@/features/document/hooks/useAreAllPrevi
 import {generatePreviews} from "@/features/document/store/imageObjectsSlice"
 import {getDocLastVersion, downloadFromUrl} from "@/features/document/utils"
 import {fileManager} from "@/features/files/fileManager"
+import {hashPassword} from "@/utils/passwordHash"
 import {ClientDocumentVersion} from "@/types"
 import {ImageSize} from "@/types.d/common"
 import {UUID} from "@/types.d/common"
@@ -67,7 +68,21 @@ export default function useGeneratePreviews({
           return
         }
         
-        if (!fileManager.getByDocVerID(docVer.id)) {
+        const cachedFile = fileManager.getByDocVerID(docVer.id)
+        
+        // Validate password if file is in cache and password-protected
+        if (cachedFile && docVer.is_password_protected && password) {
+          const isValid = await fileManager.validatePassword(docVer.id, password)
+          if (!isValid) {
+            console.log("[useGeneratePreviews] Cached file password doesn't match, clearing cache and re-downloading...")
+            fileManager.deleteByDocVerID(docVer.id)
+            setPasswordError("Incorrect password. Please try again.")
+            return
+          }
+          console.log("[useGeneratePreviews] Password validated for cached file")
+        }
+        
+        if (!cachedFile) {
           console.log("[useGeneratePreviews] PDF not in cache, downloading...")
           
           try {
@@ -89,12 +104,20 @@ export default function useGeneratePreviews({
               docVerID: result.docVerID
             })
             
-            // Store PDF in cache
+            // Store PDF in cache with password hash if password-protected
             const arrayBuffer = await result.blob.arrayBuffer()
-            fileManager.store({
+            const storeItem: {buffer: ArrayBuffer; docVerID: UUID; passwordHash?: string} = {
               buffer: arrayBuffer,
               docVerID: result.docVerID
-            })
+            }
+            
+            // Store password hash for password-protected documents
+            if (docVer.is_password_protected && password) {
+              storeItem.passwordHash = await hashPassword(password)
+              console.log("[useGeneratePreviews] Storing password hash with cached file")
+            }
+            
+            fileManager.store(storeItem)
             console.log("[useGeneratePreviews] PDF stored in cache")
           } catch (error) {
             // Catch error and store message (same pattern as download)

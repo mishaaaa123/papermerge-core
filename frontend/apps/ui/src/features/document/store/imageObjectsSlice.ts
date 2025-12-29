@@ -1,5 +1,6 @@
 import {RootState} from "@/app/types"
 import {fileManager} from "@/features/files/fileManager"
+import {hashPassword} from "@/utils/passwordHash"
 import {ImageSize, UUID} from "@/types.d/common"
 import {generatePreview as util_pdf_generatePreview} from "@/utils/pdf"
 import {
@@ -86,6 +87,18 @@ export const generatePreviews = createAsyncThunk<
   }
   let fileItem = fileManager.getByDocVerID(item.docVer.id)
 
+  // Validate password if file is in cache and password-protected
+  if (fileItem && item.docVer.is_password_protected && item.password) {
+    const isValid = await fileManager.validatePassword(item.docVer.id, item.password)
+    if (!isValid) {
+      console.log("[generatePreviews thunk] Cached file password doesn't match, clearing cache and re-downloading...")
+      fileManager.deleteByDocVerID(item.docVer.id)
+      fileItem = undefined // Force re-download
+    } else {
+      console.log("[generatePreviews thunk] Password validated for cached file")
+    }
+  }
+
   if (!fileItem) {
     console.log("[generatePreviews thunk] PDF not in cache, downloading...")
     // file not found in local storage. Download it first
@@ -103,11 +116,19 @@ export const generatePreviews = createAsyncThunk<
 
     if (ok && data) {
       const arrayBuffer = await data.blob.arrayBuffer()
-      fileItem = {
+      const storeItem: {buffer: ArrayBuffer; docVerID: UUID; passwordHash?: string} = {
         buffer: arrayBuffer,
         docVerID: data.docVerID
       }
-      fileManager.store(fileItem)
+      
+      // Store password hash for password-protected documents
+      if (item.docVer.is_password_protected && item.password) {
+        storeItem.passwordHash = await hashPassword(item.password)
+        console.log("[generatePreviews thunk] Storing password hash with cached file")
+      }
+      
+      fileManager.store(storeItem)
+      fileItem = storeItem
       console.log("[generatePreviews thunk] PDF stored in cache, size:", arrayBuffer.byteLength)
     } else {
       console.error("[generatePreviews thunk] Download error:", downloadError || "Unknown download error")
