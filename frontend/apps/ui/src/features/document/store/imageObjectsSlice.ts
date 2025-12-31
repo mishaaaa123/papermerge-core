@@ -1,6 +1,4 @@
 import {RootState} from "@/app/types"
-import {fileManager} from "@/features/files/fileManager"
-import {hashPassword} from "@/utils/passwordHash"
 import {ImageSize, UUID} from "@/types.d/common"
 import {generatePreview as util_pdf_generatePreview} from "@/utils/pdf"
 import {
@@ -85,61 +83,36 @@ export const generatePreviews = createAsyncThunk<
   const result: ReturnType = {
     items: []
   }
-  let fileItem = fileManager.getByDocVerID(item.docVer.id)
+  // Always download (no cache check, no password validation)
+  let fileItem: {buffer: ArrayBuffer; docVerID: UUID} | null = null
 
-  // Validate password if file is in cache and password-protected
-  if (fileItem && item.docVer.is_password_protected && item.password) {
-    const isValid = await fileManager.validatePassword(item.docVer.id, item.password)
-    if (!isValid) {
-      console.log("[generatePreviews thunk] Cached file password doesn't match, clearing cache and re-downloading...")
-      fileManager.deleteByDocVerID(item.docVer.id)
-      fileItem = undefined // Force re-download
-    } else {
-      console.log("[generatePreviews thunk] Password validated for cached file")
-    }
-  }
-
-  if (!fileItem) {
+  if (true) {
     console.log("[generatePreviews thunk] PDF not in cache, downloading...")
     // file not found in local storage. Download it first
-    const {
-      ok,
-      data,
-      error: downloadError
-    } = await getDocLastVersion(item.docVer.document_id, item.password)
+    try {
+      const result = await getDocLastVersion(item.docVer.document_id, item.password)
 
-    console.log("[generatePreviews thunk] Download result:", {
-      ok,
-      hasData: !!data,
-      error: downloadError
-    })
+      console.log("[generatePreviews thunk] Download result:", {
+        hasData: !!result,
+        docVerID: result.docVerID
+      })
 
-    if (ok && data) {
-      const arrayBuffer = await data.blob.arrayBuffer()
-      const storeItem: {buffer: ArrayBuffer; docVerID: UUID; passwordHash?: string} = {
+      const arrayBuffer = await result.blob.arrayBuffer()
+      // PDF downloaded but not cached (no password hash stored)
+      fileItem = {
         buffer: arrayBuffer,
-        docVerID: data.docVerID
+        docVerID: result.docVerID
       }
-      
-      // Store password hash for password-protected documents
-      if (item.docVer.is_password_protected && item.password) {
-        storeItem.passwordHash = await hashPassword(item.password)
-        console.log("[generatePreviews thunk] Storing password hash with cached file")
-      }
-      
-      fileManager.store(storeItem)
-      fileItem = storeItem
-      console.log("[generatePreviews thunk] PDF stored in cache, size:", arrayBuffer.byteLength)
-    } else {
-      console.error("[generatePreviews thunk] Download error:", downloadError || "Unknown download error")
+      console.log("[generatePreviews thunk] PDF downloaded (not cached), size:", arrayBuffer.byteLength)
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown download error"
+      console.error("[generatePreviews thunk] Download error:", errorMessage)
       return {
         items: [],
-        error: "There was an error generating thumbnail image"
+        error: errorMessage
+      }
       }
     }
-  } else {
-    console.log("[generatePreviews thunk] PDF already in cache")
-  }
 
   const file = new File([fileItem.buffer], "filename.pdf", {
     type: "application/pdf"
@@ -365,6 +338,34 @@ const imageObjectsSlice = createSlice({
           ...rotated
         }
       }
+    },
+    clearPreviewsByDocVerID(state, action: PayloadAction<{docVerID: UUID}>) {
+      const {docVerID} = action.payload
+      
+      // Find all pageIDs that belong to this docVerID
+      const pageIDsToRemove: string[] = []
+      
+      for (const [pageID, entry] of Object.entries(state.pageIDEntities)) {
+        if (entry.docVerID === docVerID) {
+          pageIDsToRemove.push(pageID)
+          
+          // Revoke blob URLs to free memory
+          const sizes = ["sm", "md", "lg", "xl"] as const
+          for (const size of sizes) {
+            if (entry[size]) {
+              console.log(`[imageObjectsSlice] Revoking blob URL for pageID ${pageID}, size ${size}`)
+              URL.revokeObjectURL(entry[size]!)
+            }
+          }
+        }
+      }
+      
+      // Remove entries from state
+      for (const pageID of pageIDsToRemove) {
+        delete state.pageIDEntities[pageID]
+      }
+      
+      console.log(`[imageObjectsSlice] Cleared ${pageIDsToRemove.length} previews for docVerID ${docVerID}`)
     }
   },
   extraReducers: builder => {
@@ -431,7 +432,8 @@ export default imageObjectsSlice.reducer
 export const {
   markGeneratingPreviewsBegin,
   markGeneratingPreviewsEnd,
-  addImageObjects
+  addImageObjects,
+  clearPreviewsByDocVerID
 } = imageObjectsSlice.actions
 
 export const selectImageObjects = (state: RootState) => state.imageObjects

@@ -61,7 +61,19 @@ async function download_file(doc_ver: DocumentVersion, password?: string) {
     }
   }
   
-  const resp2 = await client.get(downloadUrl, {responseType: "blob"})
+  // Add cache-busting to ensure fresh download every time
+  const cacheBuster = `_t=${Date.now()}`
+  const separator = downloadUrl.includes("?") ? "&" : "?"
+  const urlWithCacheBuster = `${downloadUrl}${separator}${cacheBuster}`
+  
+  const resp2 = await client.get(urlWithCacheBuster, {
+    responseType: "blob",
+    headers: {
+      "Cache-Control": "no-cache, no-store, must-revalidate",
+      "Pragma": "no-cache",
+      "Expires": "0"
+    }
+  })
   const blob = resp2.data
   const url = window.URL.createObjectURL(blob)
   /*

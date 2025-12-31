@@ -116,7 +116,19 @@ export async function downloadFromUrl(
   }
 
   try {
-    const resp = await client.get(url, {responseType: "blob"})
+    // Add cache-busting to ensure fresh download every time
+    const cacheBuster = `_t=${Date.now()}`
+    const separator = url.includes("?") ? "&" : "?"
+    const urlWithCacheBuster = `${url}${separator}${cacheBuster}`
+    
+    const resp = await client.get(urlWithCacheBuster, {
+      responseType: "blob",
+      headers: {
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0"
+      }
+    })
     
     if (resp.status === 403) {
       // Password error - extract error message and throw
@@ -181,7 +193,15 @@ export async function downloadFromUrl(
 
 export async function getDocLastVersion(docID: UUID, password?: string): Promise<DownloadResult> {
   try {
-    let resp = await client.get(`/api/documents/${docID}/last-version/`)
+    // Add cache-busting to ensure fresh download every time
+    const cacheBuster = `_t=${Date.now()}`
+    let resp = await client.get(`/api/documents/${docID}/last-version/?${cacheBuster}`, {
+      headers: {
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0"
+      }
+    })
 
     if (resp.status !== 200) {
       throw new Error(`Error downloading URL for ${docID}: ${resp.status}`)

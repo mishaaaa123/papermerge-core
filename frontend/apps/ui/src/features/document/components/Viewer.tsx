@@ -27,6 +27,7 @@ import {
   pagesRotated,
   selectAllPages
 } from "@/features/document/store/documentVersSlice"
+import {clearPreviewsByDocVerID} from "@/features/document/store/imageObjectsSlice"
 import {
   currentDocVerUpdated,
   currentNodeChanged,
@@ -88,9 +89,14 @@ export function Viewer({doc, docVer}: Args) {
   // Show password modal when document is password-protected
   useEffect(() => {
     if (docVer?.is_password_protected && !password && !passwordModalOpened) {
+      // Clear any existing previews when password modal opens
+      if (docVer.id) {
+        console.log("[Viewer] Clearing previews when password modal opens")
+        dispatch(clearPreviewsByDocVerID({docVerID: docVer.id}))
+      }
       openPasswordModal()
     }
-  }, [docVer?.is_password_protected, password, passwordModalOpened, openPasswordModal])
+  }, [docVer?.is_password_protected, docVer?.id, password, passwordModalOpened, openPasswordModal, dispatch])
   
   // Always call the hook to respect React's rules of hooks; for videos we simply ignore its result.
   const {allPreviewsAreAvailable: previewsReady, passwordError: previewPasswordError} = useGeneratePreviews({
@@ -117,6 +123,12 @@ export function Viewer({doc, docVer}: Args) {
         // Treat as password error
         setPasswordError(errorMessage)
         setPassword(null)
+
+        // Clear existing previews when password error occurs
+        if (docVer?.id) {
+          console.log("[Viewer] Clearing previews due to password error")
+          dispatch(clearPreviewsByDocVerID({docVerID: docVer.id}))
+        }
 
         // Ensure password modal is open so user can retry
         if (!passwordModalOpened) {
