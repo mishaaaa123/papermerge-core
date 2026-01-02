@@ -88,6 +88,8 @@ case $CMD in
     /usr/bin/fix_auth_server_orm.sh
     # Fix auth server API to remove home_folder_id/inbox_folder_id usage and fix folder creation
     /usr/bin/fix_auth_server_api.sh
+    # Add @property methods to User model for home_folder_id and inbox_folder_id
+    /usr/bin/fix_auth_server_user_properties.sh
     # TODO: replace roco with env2js
     roco > /usr/share/nginx/html/auth_server/papermerge-runtime-config.js
     # Once user options endpoint is implemented, following two lines will removed
@@ -100,6 +102,8 @@ case $CMD in
     /usr/bin/fix_auth_server_orm.sh
     # Fix auth server API to remove home_folder_id/inbox_folder_id usage and fix folder creation
     /usr/bin/fix_auth_server_api.sh
+    # Add @property methods to User model for home_folder_id and inbox_folder_id
+    /usr/bin/fix_auth_server_user_properties.sh
     # TODO: replace roco with env2js
     roco > /usr/share/nginx/html/auth_server/papermerge-runtime-config.js
     # Once user options endpoint is implemented, following two lines will removed

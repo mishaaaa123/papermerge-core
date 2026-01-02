@@ -38,8 +38,31 @@ import type {NType, PanelMode} from "@/types"
 import ActionButtons from "./ActionButtons"
 
 export default function SharedViewer() {
-  const {doc} = useCurrentSharedDoc()
-  const {docVer} = useCurrentSharedDocVer()
+  const {doc, isError: docError} = useCurrentSharedDoc()
+  const {docVer, isError: docVerError} = useCurrentSharedDocVer()
+  
+  // Debug: Log doc and docVer state
+  useEffect(() => {
+    console.log("[SharedViewer] Doc state:", {
+      hasDoc: !!doc,
+      docID: doc?.id,
+      docTitle: doc?.title,
+      hasVersions: !!doc?.versions,
+      versionsCount: doc?.versions?.length,
+      versions: doc?.versions?.map(v => ({
+        id: v.id,
+        number: v.number,
+        is_password_protected: v.is_password_protected,
+        download_url: v.download_url
+      })),
+      docError: docError
+    })
+    console.log("[SharedViewer] DocVer state:", {
+      hasDocVer: !!docVer,
+      docVerID: docVer?.id,
+      docVerError: docVerError
+    })
+  }, [doc, docVer, docError, docVerError])
 
   const ref = useRef<HTMLDivElement>(null)
   const mode: PanelMode = useContext(PanelContext)
@@ -237,15 +260,16 @@ export default function SharedViewer() {
     // If needsPassword is false, modal won't be rendered anyway
   }
 
-  if (!doc) {
-    return <Loader />
-  }
-
-  if (!docVer) {
-    return <Loader />
-  }
+  // Debug: Log before early returns
+  console.log("[SharedViewer] Render check:", {
+    hasDoc: !!doc,
+    hasDocVer: !!docVer,
+    docError: docError,
+    docVerError: docVerError
+  })
 
   // Clear previews when password modal opens (whenever needsPassword becomes true)
+  // IMPORTANT: This hook MUST be called before any early returns to avoid React error #310
   useEffect(() => {
     if (needsPassword && docVer?.id) {
       // Clear any existing previews when password modal opens
@@ -253,6 +277,21 @@ export default function SharedViewer() {
       dispatch(clearPreviewsByDocVerID({docVerID: docVer.id}))
     }
   }, [needsPassword, docVer?.id, dispatch])
+
+  // Early returns MUST come after ALL hooks
+  if (!doc) {
+    console.log("[SharedViewer] No doc, showing loader")
+    return <Loader />
+  }
+
+  if (!docVer) {
+    console.log("[SharedViewer] No docVer, showing loader. Doc has versions:", {
+      hasVersions: !!doc?.versions,
+      versionsCount: doc?.versions?.length,
+      versions: doc?.versions
+    })
+    return <Loader />
+  }
 
   if (needsPassword) {
     return (

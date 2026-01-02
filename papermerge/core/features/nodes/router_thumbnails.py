@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import APIRouter, HTTPException, Security, Depends
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
+from pdf2image.exceptions import PDFPageCountError
 
 from papermerge.core import utils
 from papermerge.core.features.users import schema as usr_schema
@@ -88,11 +89,32 @@ async def get_document_thumbnail(
     jpg_abs_path = rel2abs(thumbnail_path(page.id))
 
     if not os.path.exists(jpg_abs_path):
-        image.gen_doc_thumbnail(
-            page_id=page.id,
-            doc_ver_id=doc_ver.id,
-            page_number=1,
-            file_name=doc_ver.file_name,
-        )
+        try:
+            image.gen_doc_thumbnail(
+                page_id=page.id,
+                doc_ver_id=doc_ver.id,
+                page_number=1,
+                file_name=doc_ver.file_name,
+            )
+        except PDFPageCountError as e:
+            logger.error(
+                "Failed to generate thumbnail for document %s: %s",
+                document_id,
+                str(e)
+            )
+            raise HTTPException(
+                status_code=500,
+                detail="Unable to generate thumbnail. The PDF file may be corrupted or invalid."
+            )
+        except Exception as e:
+            logger.error(
+                "Unexpected error generating thumbnail for document %s: %s",
+                document_id,
+                str(e)
+            )
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to generate thumbnail"
+            )
 
     return JPEGFileResponse(jpg_abs_path)

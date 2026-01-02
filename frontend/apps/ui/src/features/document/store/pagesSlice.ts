@@ -22,7 +22,9 @@ const pagesSlice = createSlice({
         let all_pages: Array<PageType> = []
 
         action.payload.versions.forEach(v => {
-          v.pages.forEach(p => {
+          // Handle null/undefined pages array
+          const pagesArray = v.pages || []
+          pagesArray.forEach(p => {
             all_pages.push(p)
           })
         })

@@ -189,6 +189,8 @@ const docVersSlice = createSlice({
         let all_vers: Array<ClientDocumentVersion> = []
 
         action.payload.versions.forEach(v => {
+          // Handle null/undefined pages array
+          const pagesArray = v.pages || []
           let ver: ClientDocumentVersion = {
             id: v.id,
             lang: v.lang,
@@ -197,10 +199,10 @@ const docVersSlice = createSlice({
             document_id: v.document_id,
             size: v.size,
             short_description: v.short_description,
-            pages: v.pages.map(p => {
+            pages: pagesArray.map(p => {
               return {id: p.id, number: p.number, angle: 0}
             }),
-            initial_pages: v.pages
+            initial_pages: [...pagesArray]
               .sort((a, b) => a.number - b.number)
               .map(p => {
                 return {id: p.id, number: p.number, angle: 0}
