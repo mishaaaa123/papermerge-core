@@ -33,8 +33,11 @@ export default function DownloadButtonContainer() {
         error.includes("password") || 
         error.includes("Password") || 
         error.includes("403") || 
-        error.includes("Incorrect")
+        error.includes("Incorrect") ||
+        error.includes("Request failed with status code 403")
       )) {
+        // Normalize password error message
+        const normalizedError = "Wrong Password! Try Again."
         // Only show if modal isn't already open for this docVer
         if (!passwordModal.opened || passwordModal.docVerId !== docVerId) {
           const version = versions?.find(v => v.id === docVerId)
@@ -44,11 +47,11 @@ export default function DownloadButtonContainer() {
               docVerId,
               fileName: version.fileName || `Version ${version.number}`
             })
-            setPasswordError(error) // Set error message
+            setPasswordError(normalizedError) // Set normalized error message
           }
         } else if (passwordModal.docVerId === docVerId) {
           // Update error if modal is already open for this docVer
-          setPasswordError(error)
+          setPasswordError(normalizedError)
         }
       }
     })
@@ -91,9 +94,11 @@ export default function DownloadButtonContainer() {
           errorMessage.includes("password") || 
           errorMessage.includes("Password") || 
           errorMessage.includes("403") ||
-          errorMessage.includes("Incorrect")
+          errorMessage.includes("Incorrect") ||
+          errorMessage.includes("Request failed with status code 403")
         ) {
-          setPasswordError(errorMessage)
+          // Normalize password error message
+          setPasswordError("Wrong Password! Try Again.")
           // Keep modal open so user can try again
         } else {
           // Other error - close modal

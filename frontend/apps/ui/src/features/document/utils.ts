@@ -131,24 +131,8 @@ export async function downloadFromUrl(
     })
     
     if (resp.status === 403) {
-      // Password error - extract error message and throw
-      const errorDetail = resp.data
-      let errorMessage = "Password required or incorrect password"
-      
-      // Try to extract error message from response
-      if (errorDetail) {
-        if (typeof errorDetail === "object" && errorDetail.detail) {
-          if (Array.isArray(errorDetail.detail) && errorDetail.detail.length > 0) {
-            errorMessage = errorDetail.detail[0]
-          } else if (typeof errorDetail.detail === "string") {
-            errorMessage = errorDetail.detail
-          }
-        } else if (typeof errorDetail === "string") {
-          errorMessage = errorDetail
-        }
-      }
-      
-      throw new Error(errorMessage)
+      // Password error - normalize to user-friendly message
+      throw new Error("Wrong Password! Try Again.")
     }
     
     if (resp.status !== 200) {
@@ -165,23 +149,8 @@ export async function downloadFromUrl(
     // Handle axios errors
     if (axios.isAxiosError(error)) {
       if (error.response?.status === 403) {
-        // Password error - extract error message
-        const errorDetail = error.response.data
-        let errorMessage = "Password required or incorrect password"
-        
-        if (errorDetail) {
-          if (typeof errorDetail === "object" && errorDetail.detail) {
-            if (Array.isArray(errorDetail.detail) && errorDetail.detail.length > 0) {
-              errorMessage = errorDetail.detail[0]
-            } else if (typeof errorDetail.detail === "string") {
-              errorMessage = errorDetail.detail
-            }
-          } else if (typeof errorDetail === "string") {
-            errorMessage = errorDetail
-          }
-        }
-        
-        throw new Error(errorMessage)
+        // Password error - normalize to user-friendly message
+        throw new Error("Wrong Password! Try Again.")
       }
       
       if (error.response?.status === 429) {
@@ -245,23 +214,8 @@ export async function getDocLastVersion(docID: UUID, password?: string): Promise
     // Handle axios errors from the first API call
     if (axios.isAxiosError(error)) {
       if (error.response?.status === 403) {
-        // Password error - extract error message
-        const errorDetail = error.response.data
-        let errorMessage = "Password required or incorrect password"
-        
-        if (errorDetail) {
-          if (typeof errorDetail === "object" && errorDetail.detail) {
-            if (Array.isArray(errorDetail.detail) && errorDetail.detail.length > 0) {
-              errorMessage = errorDetail.detail[0]
-            } else if (typeof errorDetail.detail === "string") {
-              errorMessage = errorDetail.detail
-            }
-          } else if (typeof errorDetail === "string") {
-            errorMessage = errorDetail
-          }
-        }
-        
-        throw new Error(errorMessage)
+        // Password error - normalize to user-friendly message
+        throw new Error("Wrong Password! Try Again.")
       }
       
       throw new Error(`Request failed: ${error.response?.status || "Network error"} - ${error.message}`)

@@ -182,8 +182,9 @@ export default function DownloadButtonContainer() {
           errorMessage = "Download limit exceeded. Try again tomorrow"
         }
         
-        if (errorMessage.includes("password") || errorMessage.includes("Password") || errorMessage.includes("403")) {
-          setPasswordError(errorMessage)
+        if (errorMessage.includes("password") || errorMessage.includes("Password") || errorMessage.includes("403") || errorMessage.includes("Request failed with status code 403")) {
+          // Normalize password error message
+          setPasswordError("Wrong Password! Try Again.")
           // Keep modal open so user can try again
         } else {
           // Other error - close modal

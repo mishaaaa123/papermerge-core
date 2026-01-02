@@ -187,9 +187,11 @@ export default function SharedViewer() {
         errorMessage.includes("password") || 
         errorMessage.includes("Password") || 
         errorMessage.includes("403") || 
-        errorMessage.includes("Incorrect")
+        errorMessage.includes("Incorrect") ||
+        errorMessage.includes("Request failed with status code 403")
       ) {
-        setPasswordError(errorMessage)
+        // Normalize password error message
+        setPasswordError("Wrong Password! Try Again.")
         setPassword(null) // Clear password so user can try again - this will make needsPassword=true, showing modal again
         
         // Clear existing previews when password error occurs

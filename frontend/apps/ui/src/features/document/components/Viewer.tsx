@@ -139,10 +139,11 @@ export function Viewer({doc, docVer}: Args) {
         errorMessage.includes("password") ||
         errorMessage.includes("Password") ||
         errorMessage.includes("403") ||
-        errorMessage.includes("Incorrect")
+        errorMessage.includes("Incorrect") ||
+        errorMessage.includes("Request failed with status code 403")
       ) {
-        // Treat as password error
-        setPasswordError(errorMessage)
+        // Treat as password error - normalize message
+        setPasswordError("Wrong Password! Try Again.")
         setPassword(null)
 
         // Clear existing previews when password error occurs

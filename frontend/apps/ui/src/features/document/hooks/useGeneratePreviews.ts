@@ -84,9 +84,11 @@ export default function useGeneratePreviews({
         if (result.error) {
           const errorMessage = result.error
           
-          // Normalize 429/rate limit errors to consistent message
+          // Normalize error messages
           if (errorMessage.includes("429") || errorMessage.includes("Request failed with status code 429")) {
             setPasswordError("Download limit exceeded. Try again tomorrow")
+          } else if (errorMessage.includes("403") || errorMessage.includes("Request failed with status code 403") || errorMessage.includes("password") || errorMessage.includes("Password") || errorMessage.includes("Incorrect")) {
+            setPasswordError("Wrong Password! Try Again.")
           } else {
             setPasswordError(errorMessage)
           }
@@ -101,9 +103,11 @@ export default function useGeneratePreviews({
           errorMessage = error
         }
         
-        // Normalize 429/rate limit errors to consistent message
+        // Normalize error messages
         if (errorMessage.includes("429") || errorMessage.includes("Request failed with status code 429")) {
           errorMessage = "Download limit exceeded. Try again tomorrow"
+        } else if (errorMessage.includes("403") || errorMessage.includes("Request failed with status code 403") || errorMessage.includes("password") || errorMessage.includes("Password") || errorMessage.includes("Incorrect")) {
+          errorMessage = "Wrong Password! Try Again."
         }
         
         console.error("[useGeneratePreviews] Error generating previews:", errorMessage)
