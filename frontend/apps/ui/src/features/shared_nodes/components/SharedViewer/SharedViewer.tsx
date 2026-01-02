@@ -338,13 +338,13 @@ export default function SharedViewer() {
     return <Loader />
   }
   return (
-    <div>
+    <div ref={ref} style={{height: "100%"}}>
       <ActionButtons />
       <Group justify="space-between">
         <SharedBreadcrumbs breadcrumb={doc?.breadcrumb} onClick={onClick} />
         <DocumentDetailsToggle />
       </Group>
-      <Flex ref={ref} className={classes.inner}>
+      <Flex className={classes.inner} style={{height: "100%"}}>
         <ThumbnailList />
         <ThumbnailsToggle />
         <PageList />
