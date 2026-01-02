@@ -1,7 +1,8 @@
 import {useAppDispatch, useAppSelector} from "@/app/hooks"
 import {useCurrentDoc} from "@/features/document/hooks"
-import {Flex, Group, Loader} from "@mantine/core"
+import {Flex, Group, Loader, Text, Stack, Center} from "@mantine/core"
 import {useDisclosure} from "@mantine/hooks"
+import {notifications} from "@mantine/notifications"
 import {useContext, useState, useEffect} from "react"
 import {useNavigate} from "react-router-dom"
 import {setPanelComponent} from "@/features/ui/panelRegistry"
@@ -112,7 +113,27 @@ export function Viewer({doc, docVer}: Args) {
   useEffect(() => {
     if (previewPasswordError) {
       const errorMessage = previewPasswordError
-      console.log("[Viewer] Password error detected:", errorMessage)
+      console.log("[Viewer] Error detected:", errorMessage)
+
+      // Check if it's a rate limit error
+      if (
+        errorMessage.includes("rate limit") ||
+        errorMessage.includes("Rate limit") ||
+        errorMessage.includes("429") ||
+        errorMessage.includes("rate limit exceeded") ||
+        errorMessage.includes("Download limit exceeded")
+      ) {
+        // Rate limit error - show notification with consistent message
+        const normalizedMessage = errorMessage.includes("Download limit exceeded") 
+          ? errorMessage 
+          : "Download limit exceeded. Try again tomorrow"
+        notifications.show({
+          color: "orange",
+          title: "Download blocked",
+          message: normalizedMessage
+        })
+        return
+      }
 
       if (
         errorMessage.includes("password") ||
@@ -139,7 +160,7 @@ export function Viewer({doc, docVer}: Args) {
         setPasswordError(errorMessage)
       }
     }
-  }, [previewPasswordError, passwordModalOpened, openPasswordModal])
+  }, [previewPasswordError, passwordModalOpened, openPasswordModal, docVer?.id, dispatch])
 
   const selectedPages = useSelectedPages({mode, docVerID: docVer?.id})
 
@@ -296,6 +317,30 @@ export function Viewer({doc, docVer}: Args) {
   }
 
   if (!allPreviewsAreAvailable) {
+    // Check if it's a rate limit error
+    const isRateLimitError = previewPasswordError && (
+      previewPasswordError.includes("rate limit") ||
+      previewPasswordError.includes("Rate limit") ||
+      previewPasswordError.includes("429") ||
+      previewPasswordError.includes("rate limit exceeded") ||
+      previewPasswordError.includes("Download limit exceeded")
+    )
+    
+    if (isRateLimitError) {
+      return (
+        <Center style={{height: "100%", padding: "20px"}}>
+          <Stack align="center" gap="md">
+            <Text size="lg" fw={500} c="orange">
+              Download blocked
+            </Text>
+            <Text c="dimmed" ta="center">
+              Download limit exceeded. Try again tomorrow
+            </Text>
+          </Stack>
+        </Center>
+      )
+    }
+    
     return <Loader />
   }
 

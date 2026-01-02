@@ -54,6 +54,18 @@ export const rtkQueryErrorLogger: Middleware = () => next => action => {
       return next(action)
     }
 
+    // Skip download errors - they are handled in documentDownloadsSlice
+    const isDownloadError = 
+      action.type?.includes("fetchAndDownloadDocument") ||
+      errorMessageStr.includes("Download limit exceeded") ||
+      errorMessageStr.includes("Download failed") ||
+      errorMessageStr.includes("429")
+    
+    if (isDownloadError) {
+      // Don't show notification for download errors - handled in documentDownloadsSlice
+      return next(action)
+    }
+
     // Extract endpoint name and operation type from the action
     const endpointName = (action as RTKQueryAction).meta?.arg?.endpointName
     const operationType = extractOperationType(endpointName)

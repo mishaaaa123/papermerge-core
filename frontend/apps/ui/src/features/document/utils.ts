@@ -184,6 +184,26 @@ export async function downloadFromUrl(
         throw new Error(errorMessage)
       }
       
+      if (error.response?.status === 429) {
+        // Rate limit error - extract error message or use default
+        const errorDetail = error.response.data
+        let errorMessage = "Download limit exceeded. Try again tomorrow"
+        
+        if (errorDetail) {
+          if (typeof errorDetail === "object" && errorDetail.detail) {
+            if (Array.isArray(errorDetail.detail) && errorDetail.detail.length > 0) {
+              errorMessage = errorDetail.detail[0]
+            } else if (typeof errorDetail.detail === "string") {
+              errorMessage = errorDetail.detail
+            }
+          } else if (typeof errorDetail === "string") {
+            errorMessage = errorDetail
+          }
+        }
+        
+        throw new Error(errorMessage)
+      }
+      
       throw new Error(`Request failed: ${error.response?.status || "Network error"} - ${error.message}`)
     }
     

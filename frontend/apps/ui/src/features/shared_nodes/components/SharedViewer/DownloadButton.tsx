@@ -46,7 +46,13 @@ async function downloadSharedDocument(
     // Error already thrown by downloadFromUrl with proper message
     // Don't show notification here - let the component handle it via modal
     // Only show notification for non-password errors
-    const errorMessage = error instanceof Error ? error.message : "Download failed"
+    let errorMessage = error instanceof Error ? error.message : "Download failed"
+    
+    // Check if error message contains 429 or rate limit indicators
+    if (errorMessage.includes("429") || errorMessage.includes("Request failed with status code 429")) {
+      errorMessage = "Download limit exceeded. Try again tomorrow"
+    }
+    
     const isPasswordError = 
       errorMessage.includes("password") || 
       errorMessage.includes("Password") || 
@@ -169,7 +175,13 @@ export default function DownloadButtonContainer() {
         setPasswordModal({opened: false, docVerId: null, fileName: "", downloadUrl: null})
       } catch (error) {
         // Check if it's a password error
-        const errorMessage = error instanceof Error ? error.message : "Download failed"
+        let errorMessage = error instanceof Error ? error.message : "Download failed"
+        
+        // Check if error message contains 429 or rate limit indicators
+        if (errorMessage.includes("429") || errorMessage.includes("Request failed with status code 429")) {
+          errorMessage = "Download limit exceeded. Try again tomorrow"
+        }
+        
         if (errorMessage.includes("password") || errorMessage.includes("Password") || errorMessage.includes("403")) {
           setPasswordError(errorMessage)
           // Keep modal open so user can try again

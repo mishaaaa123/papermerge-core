@@ -132,6 +132,11 @@ export function getErrorMessage(
             defaultValue: "Validation error. Please check your input."
           })
         }),
+        429: t(`errors.${context}.rate_limit`, {
+          defaultValue: t("errors.rate_limit", {
+            defaultValue: "Download limit exceeded. Try again tomorrow."
+          })
+        }),
         500: t(`errors.${context}.server_error`, {
           defaultValue: t("errors.server_error", {
             defaultValue: "Server error. Please try again later."
@@ -205,6 +210,11 @@ export function getErrorTitle(
     if (error.status === 422 || error.status === 400) {
       return t("errors.title.validation_error", {
         defaultValue: "Validation Error"
+      })
+    }
+    if (error.status === 429) {
+      return t("errors.title.rate_limit", {
+        defaultValue: "Download blocked"
       })
     }
   }

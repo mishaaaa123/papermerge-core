@@ -92,7 +92,13 @@ export default function useGeneratePreviews({
         console.log("[useGeneratePreviews] PDF downloaded (not cached)")
       } catch (error) {
         // Catch error and store message (same pattern as download)
-        const errorMessage = error instanceof Error ? error.message : "Unknown error"
+        let errorMessage = error instanceof Error ? error.message : "Unknown error"
+        
+        // Normalize 429/rate limit errors to consistent message
+        if (errorMessage.includes("429") || errorMessage.includes("Request failed with status code 429")) {
+          errorMessage = "Download limit exceeded. Try again tomorrow"
+        }
+        
         console.error("[useGeneratePreviews] Download error:", errorMessage)
         setPasswordError(errorMessage)
         // Don't try to generate previews on error

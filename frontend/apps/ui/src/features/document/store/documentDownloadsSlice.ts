@@ -87,6 +87,10 @@ export const fetchAndDownloadDocument = createAsyncThunk<
       // downloadFromUrl throws Error with message, so extract it first
       if (err instanceof Error) {
         errorMessage = err.message
+        // Check if error message contains 429 or rate limit indicators
+        if (errorMessage.includes("429") || errorMessage.includes("Request failed with status code 429")) {
+          errorMessage = "Download limit exceeded. Try again tomorrow"
+        }
       } else {
         // Handle other error types (e.g., from getting download URL)
       const axiosError = err as AxiosError<{detail?: string}>
@@ -95,7 +99,7 @@ export const fetchAndDownloadDocument = createAsyncThunk<
         if (axiosError.response.status === 429) {
           errorMessage =
             axiosError.response.data?.detail ||
-            "You've reached the download rate limit. Please try again in a moment."
+            "Download limit exceeded. Try again tomorrow"
         } else {
           errorMessage =
             axiosError.response.data?.detail ||
@@ -104,6 +108,10 @@ export const fetchAndDownloadDocument = createAsyncThunk<
         }
       } else if (axiosError?.message) {
         errorMessage = axiosError.message
+        // Check if error message contains 429
+        if (errorMessage.includes("429") || errorMessage.includes("Request failed with status code 429")) {
+          errorMessage = "Download limit exceeded. Try again tomorrow"
+        }
       }
       }
 
