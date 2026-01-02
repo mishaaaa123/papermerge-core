@@ -94,7 +94,7 @@ export default function useSharedCurrentDocVer(): ReturnState {
     lastVersionType: typeof lastVersion,
     lastVersionKeys: lastVersion ? Object.keys(lastVersion) : null
   })
-  
+
   const docVer: ClientDocumentVersion | undefined = useMemo(() => {
     console.log("[useCurrentSharedDocVer] 🔵 Creating docVer - useMemo running:", {
       hasDocVerFromSlice: !!docVerFromSlice,
@@ -114,8 +114,8 @@ export default function useSharedCurrentDocVer(): ReturnState {
     if (lastVersion) {
       console.log("[useCurrentSharedDocVer] ⚠️ docVerFromSlice not found, converting lastVersion to ClientDocumentVersion")
       try {
-        // Handle null/undefined pages array
-        const pagesArray = lastVersion.pages || []
+      // Handle null/undefined pages array
+      const pagesArray = lastVersion.pages || []
         console.log("[useCurrentSharedDocVer] Pages array:", {
           original: lastVersion.pages,
           processed: pagesArray,
@@ -123,37 +123,37 @@ export default function useSharedCurrentDocVer(): ReturnState {
           isArray: Array.isArray(pagesArray)
         })
         
-        // Convert server version to client version format
+      // Convert server version to client version format
         const converted = {
-          id: lastVersion.id,
-          lang: lastVersion.lang,
-          number: lastVersion.number,
+        id: lastVersion.id,
+        lang: lastVersion.lang,
+        number: lastVersion.number,
           file_name: lastVersion.file_name || null,
-          document_id: lastVersion.document_id,
-          size: lastVersion.size,
+        document_id: lastVersion.document_id,
+        size: lastVersion.size,
           short_description: lastVersion.short_description || null,
-          pages: pagesArray.map(p => ({
+        pages: pagesArray.map(p => ({
+          id: p.id,
+          number: p.number,
+          angle: 0
+        })),
+        initial_pages: [...pagesArray]
+          .sort((a, b) => a.number - b.number)
+          .map(p => ({
             id: p.id,
             number: p.number,
             angle: 0
           })),
-          initial_pages: [...pagesArray]
-            .sort((a, b) => a.number - b.number)
-            .map(p => ({
-              id: p.id,
-              number: p.number,
-              angle: 0
-            })),
-          pagination: {
-            page_number: 1,
-            per_page: DOC_VER_PAGINATION_PAGE_BATCH_SIZE
-          },
-          thumbnailsPagination: {
-            page_number: 1,
-            per_page: DOC_VER_PAGINATION_THUMBNAIL_BATCH_SIZE
-          },
-          is_password_protected: lastVersion.is_password_protected || false
-        } as ClientDocumentVersion
+        pagination: {
+          page_number: 1,
+          per_page: DOC_VER_PAGINATION_PAGE_BATCH_SIZE
+        },
+        thumbnailsPagination: {
+          page_number: 1,
+          per_page: DOC_VER_PAGINATION_THUMBNAIL_BATCH_SIZE
+        },
+        is_password_protected: lastVersion.is_password_protected || false
+      } as ClientDocumentVersion
         
         console.log("[useCurrentSharedDocVer] ✅ Successfully converted to ClientDocumentVersion:", {
           id: converted.id,

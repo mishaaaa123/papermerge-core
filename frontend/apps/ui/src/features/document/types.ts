@@ -38,6 +38,8 @@ export interface GeneratePreviewInputType {
   pageTotal: number
   thumbnailListPageCount?: number
   password?: string
+  downloadUrl?: string // For shared documents - download URL from version
+  useCache?: boolean // If false, bypass cache check but still store in cache (default: true)
 }
 
 export type BasicPageType = {

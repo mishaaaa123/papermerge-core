@@ -10,13 +10,30 @@ import usePageList from "@/features/document/components/PageList/usePageList"
 import {DOC_VER_PAGINATION_PAGE_BATCH_SIZE} from "@/features/document/constants"
 import useAreAllPreviewsAvailable from "@/features/document/hooks/useAreAllPreviewsAvailable"
 import useCurrentSharedDocVer from "@/features/shared_nodes/hooks/useCurrentSharedDocVer"
+import useCurrentSharedDoc from "@/features/shared_nodes/hooks/useCurrentSharedDoc"
 import {selectZoomFactor, selectDocumentCurrentPage, viewerCurrentPageUpdated} from "@/features/ui/uiSlice"
 import type {PanelMode} from "@/types"
-import {useContext, useEffect, useRef} from "react"
+import {useContext, useEffect, useRef, useMemo} from "react"
 import {PageList} from "viewer"
 
-export default function PageListContainer() {
+interface Props {
+  password?: string // Password for password-protected documents
+}
+
+export default function PageListContainer({password}: Props) {
   const {docVer} = useCurrentSharedDocVer()
+  const {doc} = useCurrentSharedDoc()
+  
+  // Get downloadUrl from doc (same logic as SharedViewer)
+  const downloadUrl = useMemo(() => {
+    if (!doc?.versions || doc.versions.length === 0) {
+      return undefined
+    }
+    const lastVersion = doc.versions.reduce((latest, v) => 
+      v.number > latest.number ? v : latest
+    )
+    return lastVersion.download_url || undefined
+  }, [doc?.versions])
   const dispatch = useAppDispatch()
   const mode: PanelMode = useContext(PanelContext)
   const zoomFactor = useAppSelector(s => selectZoomFactor(s, mode))
@@ -71,7 +88,7 @@ export default function PageListContainer() {
   useEffect(() => {
     if (loadMore && !isGenerating) {
       if (!allPreviewsAreAvailable) {
-        dispatch(generateNextPreviews({docVer, pageNumber: nextPageNumber}))
+        dispatch(generateNextPreviews({docVer, pageNumber: nextPageNumber, downloadUrl, password}))
       }
     }
   }, [
@@ -80,6 +97,8 @@ export default function PageListContainer() {
     allPreviewsAreAvailable,
     pageNumber,
     docVer,
+    downloadUrl,
+    password,
     dispatch
   ])
 

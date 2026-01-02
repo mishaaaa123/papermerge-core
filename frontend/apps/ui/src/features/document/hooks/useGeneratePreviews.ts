@@ -1,10 +1,8 @@
 import {useAppDispatch} from "@/app/hooks"
 import useAreAllPreviewsAvailable from "@/features/document/hooks/useAreAllPreviewsAvailable"
 import {generatePreviews} from "@/features/document/store/imageObjectsSlice"
-import {getDocLastVersion, downloadFromUrl} from "@/features/document/utils"
 import {ClientDocumentVersion} from "@/types"
 import {ImageSize} from "@/types.d/common"
-import {UUID} from "@/types.d/common"
 import {useEffect, useState} from "react"
 
 interface Args {
@@ -58,68 +56,63 @@ export default function useGeneratePreviews({
         imageSize
       })
 
-      // Always generate previews (download every time, bypass preview availability check)
       // Don't try to load if password-protected and no password provided
       if (docVer.is_password_protected && !password) {
         console.log("[useGeneratePreviews] Document is password-protected, password required")
         return
       }
       
-      // Always download (no cache check, always re-download)
-      console.log("[useGeneratePreviews] Downloading PDF (always re-download)...")
+      // Dispatch generatePreviews - it will handle download and caching
+      // useCache: false means always download fresh (skip cache check) but still cache result
+      console.log("[useGeneratePreviews] Dispatching generatePreviews (useCache: false - fresh download but will cache)...")
       
       try {
-        let result: {docVerID: UUID; blob: Blob}
+        const result = await dispatch(
+          generatePreviews({
+            docVer,
+            size: imageSize,
+            pageSize,
+            pageNumber,
+            pageTotal: docVer.pages.length,
+            password,
+            downloadUrl, // Pass downloadUrl for shared documents
+            useCache: false // Always download fresh for document opening
+          })
+        ).unwrap()
         
-        // For shared documents, use the downloadUrl directly
-        if (downloadUrl) {
-          console.log("[useGeneratePreviews] Using downloadUrl for shared document:", downloadUrl)
-          result = await downloadFromUrl(downloadUrl, docVer.id, password)
-        } else {
-          // For regular documents, use the standard endpoint
-          // getDocLastVersion now throws errors (same pattern as downloadFromUrl)
-          console.log("[useGeneratePreviews] Using getDocLastVersion for regular document:", docVer.document_id)
-          result = await getDocLastVersion(docVer.document_id, password)
+        // Check if thunk returned an error in payload
+        if (result.error) {
+          const errorMessage = result.error
+          
+          // Normalize 429/rate limit errors to consistent message
+          if (errorMessage.includes("429") || errorMessage.includes("Request failed with status code 429")) {
+            setPasswordError("Download limit exceeded. Try again tomorrow")
+          } else {
+            setPasswordError(errorMessage)
+          }
         }
+      } catch (error: any) {
+        // Handle rejected thunk or other errors
+        let errorMessage = "Failed to generate previews"
         
-        console.log("[useGeneratePreviews] Download result:", {
-          hasData: !!result,
-          docVerID: result.docVerID
-        })
-        
-        // PDF downloaded but not cached
-        const arrayBuffer = await result.blob.arrayBuffer()
-        console.log("[useGeneratePreviews] PDF downloaded (not cached)")
-      } catch (error) {
-        // Catch error and store message (same pattern as download)
-        let errorMessage = error instanceof Error ? error.message : "Unknown error"
+        if (error?.message) {
+          errorMessage = error.message
+        } else if (typeof error === "string") {
+          errorMessage = error
+        }
         
         // Normalize 429/rate limit errors to consistent message
         if (errorMessage.includes("429") || errorMessage.includes("Request failed with status code 429")) {
           errorMessage = "Download limit exceeded. Try again tomorrow"
         }
         
-        console.error("[useGeneratePreviews] Download error:", errorMessage)
+        console.error("[useGeneratePreviews] Error generating previews:", errorMessage)
         setPasswordError(errorMessage)
-        // Don't try to generate previews on error
-        return
       }
-      
-      console.log("[useGeneratePreviews] Dispatching generatePreviews...")
-      dispatch(
-        generatePreviews({
-          docVer,
-          size: imageSize,
-          pageSize,
-          pageNumber,
-          pageTotal: docVer.pages.length,
-          password
-        })
-      )
     }
 
     generate()
-  }, [dispatch, docVer, pageSize, pageNumber, allPreviewsAreAvailable, password, downloadUrl])
+  }, [dispatch, docVer, pageSize, pageNumber, password, downloadUrl])
 
   return {allPreviewsAreAvailable, passwordError}
 }

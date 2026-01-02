@@ -21,10 +21,12 @@ interface Args {
   pageNumber: number
   size?: ImageSize
   thumbnailListPageCount?: number
+  password?: string
+  downloadUrl?: string // For shared documents - download URL from version
 }
 
 export const generateNextPreviews =
-  ({docVer, pageNumber, size = "md", thumbnailListPageCount}: Args) =>
+  ({docVer, pageNumber, size = "md", thumbnailListPageCount, password, downloadUrl}: Args) =>
   async (dispatch: AppDispatch) => {
     if (!docVer) {
       return
@@ -44,7 +46,9 @@ export const generateNextPreviews =
         pageSize: pageSize,
         pageNumber,
         thumbnailListPageCount,
-        pageTotal: docVer.pages.length
+        pageTotal: docVer.pages.length,
+        password,
+        downloadUrl
       })
     )
 

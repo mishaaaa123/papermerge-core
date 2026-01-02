@@ -8,7 +8,7 @@ import {
   PayloadAction
 } from "@reduxjs/toolkit"
 import type {BasicPage, GeneratePreviewInputType} from "../types"
-import {getDocLastVersion, rotateImageObjectURL} from "../utils"
+import {getDocLastVersion, rotateImageObjectURL, downloadFromUrl} from "../utils"
 
 export type PageIDEntitiesState = {
   [pageID: string]: {
@@ -83,27 +83,72 @@ export const generatePreviews = createAsyncThunk<
   const result: ReturnType = {
     items: []
   }
-  // Always download (no cache check, no password validation)
+  // Check fileManager cache first before downloading (unless useCache is false)
   let fileItem: {buffer: ArrayBuffer; docVerID: UUID} | null = null
-
-  if (true) {
-    console.log("[generatePreviews thunk] PDF not in cache, downloading...")
-    // file not found in local storage. Download it first
+  const checkCache = item.useCache !== false // Default to true (check cache before downloading)
+  const storeCache = true // Always store in cache after downloading (for reuse by sidebar previews)
+  
+  const {fileManager} = await import("@/features/files/fileManager")
+  
+  if (checkCache) {
+    // Check cache first (for sidebar preview generation)
+    const cachedFile = fileManager.getByDocVerID(item.docVer.id)
+    
+    if (cachedFile && cachedFile.buffer) {
+      console.log("[generatePreviews thunk] PDF found in cache, reusing...")
+      fileItem = {
+        buffer: cachedFile.buffer,
+        docVerID: item.docVer.id
+      }
+    }
+  }
+  
+  // Download if not using cache or cache miss
+  if (!fileItem) {
+    if (checkCache) {
+      console.log("[generatePreviews thunk] PDF not in cache, downloading...")
+    } else {
+      console.log("[generatePreviews thunk] useCache=false, downloading fresh (bypassing cache check but will cache result)...")
+    }
+    
+    // file not found in local storage or cache check disabled. Download it first
     try {
-      const result = await getDocLastVersion(item.docVer.document_id, item.password)
+      let downloadResult: {docVerID: UUID; blob: Blob}
+      
+      // For shared documents, use the downloadUrl directly
+      if (item.downloadUrl) {
+        console.log("[generatePreviews thunk] Using downloadUrl for shared document:", item.downloadUrl)
+        downloadResult = await downloadFromUrl(item.downloadUrl, item.docVer.id, item.password)
+      } else {
+        // For regular documents, use the standard endpoint
+        console.log("[generatePreviews thunk] Using getDocLastVersion for regular document:", item.docVer.document_id)
+        downloadResult = await getDocLastVersion(item.docVer.document_id, item.password)
+      }
 
       console.log("[generatePreviews thunk] Download result:", {
-        hasData: !!result,
-        docVerID: result.docVerID
+        hasData: !!downloadResult,
+        docVerID: downloadResult.docVerID
       })
 
-      const arrayBuffer = await result.blob.arrayBuffer()
-      // PDF downloaded but not cached (no password hash stored)
+      const arrayBuffer = await downloadResult.blob.arrayBuffer()
+      
+      // Always store PDF in cache for reuse (by sidebar previews)
+      if (storeCache) {
+        fileManager.store({
+          docVerID: item.docVer.id,
+          buffer: arrayBuffer
+        })
+        if (checkCache) {
+          console.log("[generatePreviews thunk] PDF downloaded and cached, size:", arrayBuffer.byteLength)
+        } else {
+          console.log("[generatePreviews thunk] PDF downloaded fresh and cached (for sidebar reuse), size:", arrayBuffer.byteLength)
+        }
+      }
+      
       fileItem = {
         buffer: arrayBuffer,
-        docVerID: result.docVerID
+        docVerID: downloadResult.docVerID
       }
-      console.log("[generatePreviews thunk] PDF downloaded (not cached), size:", arrayBuffer.byteLength)
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown download error"
       console.error("[generatePreviews thunk] Download error:", errorMessage)

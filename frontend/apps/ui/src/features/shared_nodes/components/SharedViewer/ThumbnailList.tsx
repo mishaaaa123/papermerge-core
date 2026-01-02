@@ -7,11 +7,28 @@ import useAreAllPreviewsAvailable from "@/features/document/hooks/useAreAllPrevi
 import {selectDocVerPaginationThumnailPageNumber} from "@/features/document/store/documentVersSlice"
 import {selectIsGeneratingPreviews} from "@/features/document/store/imageObjectsSlice"
 import useCurrentSharedDocVer from "@/features/shared_nodes/hooks/useCurrentSharedDocVer"
-import {useEffect, useRef} from "react"
+import useCurrentSharedDoc from "@/features/shared_nodes/hooks/useCurrentSharedDoc"
+import {useEffect, useRef, useMemo} from "react"
 import {ThumbnailList} from "viewer"
 
-export default function ThumbnailListContainer() {
+interface Props {
+  password?: string // Password for password-protected documents
+}
+
+export default function ThumbnailListContainer({password}: Props) {
   const {docVer} = useCurrentSharedDocVer()
+  const {doc} = useCurrentSharedDoc()
+  
+  // Get downloadUrl from doc (same logic as SharedViewer)
+  const downloadUrl = useMemo(() => {
+    if (!doc?.versions || doc.versions.length === 0) {
+      return undefined
+    }
+    const lastVersion = doc.versions.reduce((latest, v) => 
+      v.number > latest.number ? v : latest
+    )
+    return lastVersion.download_url || undefined
+  }, [doc?.versions])
   const dispatch = useAppDispatch()
   const pageNumber = useAppSelector(s =>
     selectDocVerPaginationThumnailPageNumber(s, docVer?.id)
@@ -39,19 +56,19 @@ export default function ThumbnailListContainer() {
 
   useEffect(() => {
     if (pages.length == 0 && !isGenerating) {
-      dispatch(generateNextPreviews({docVer, size: "sm", pageNumber: 1}))
+      dispatch(generateNextPreviews({docVer, size: "sm", pageNumber: 1, downloadUrl, password}))
     }
-  }, [pages.length])
+  }, [pages.length, docVer, isGenerating, downloadUrl, password, dispatch])
 
   useEffect(() => {
     if (loadMore && !isGenerating) {
       if (!allPreviewsAreAvailable) {
         dispatch(
-          generateNextPreviews({docVer, size: "sm", pageNumber: pageNumber + 1})
+          generateNextPreviews({docVer, size: "sm", pageNumber: pageNumber + 1, downloadUrl, password})
         )
       }
     }
-  }, [loadMore])
+  }, [loadMore, isGenerating, allPreviewsAreAvailable, docVer, pageNumber, downloadUrl, password, dispatch])
 
   return (
     <ThumbnailList

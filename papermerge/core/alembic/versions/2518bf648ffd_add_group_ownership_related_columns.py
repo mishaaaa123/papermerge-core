@@ -187,17 +187,17 @@ def upgrade() -> None:
             )
     
     if not is_sqlite:
-        op.drop_constraint("unique tag name per user", "tags", type_="unique")
-        op.create_unique_constraint("unique tag name per user", "tags", ["name", "user_id"])
-        op.create_unique_constraint(
-            "unique tag name per group", "tags", ["name", "group_id"]
-        )
-        op.create_foreign_key(None, "tags", "groups", ["group_id"], ["id"])
-        op.create_check_constraint(
-            constraint_name="check__user_id_not_null__or__group_id_not_null",
-            table_name="tags",
-            condition="user_id IS NOT NULL OR group_id IS NOT NULL",
-        )
+    op.drop_constraint("unique tag name per user", "tags", type_="unique")
+    op.create_unique_constraint("unique tag name per user", "tags", ["name", "user_id"])
+    op.create_unique_constraint(
+        "unique tag name per group", "tags", ["name", "group_id"]
+    )
+    op.create_foreign_key(None, "tags", "groups", ["group_id"], ["id"])
+    op.create_check_constraint(
+        constraint_name="check__user_id_not_null__or__group_id_not_null",
+        table_name="tags",
+        condition="user_id IS NOT NULL OR group_id IS NOT NULL",
+    )
     # ### end Alembic commands ###
 
 
@@ -217,8 +217,8 @@ def downgrade() -> None:
                 pass
             batch_op.create_unique_constraint("unique tag name per user", ["name", "user_id"])
     else:
-        op.drop_constraint("unique tag name per user/group", "tags", type_="unique")
-        op.create_unique_constraint("unique tag name per user", "tags", ["name", "user_id"])
+    op.drop_constraint("unique tag name per user/group", "tags", type_="unique")
+    op.create_unique_constraint("unique tag name per user", "tags", ["name", "user_id"])
 
     with op.batch_alter_table("tags") as batch_op:
         batch_op.alter_column("user_id", existing_type=sa.UUID(), nullable=False)
@@ -227,7 +227,7 @@ def downgrade() -> None:
 
     # nodes
     if not is_sqlite:
-        op.drop_constraint("nodes_group_id_fkey", "nodes", type_="foreignkey")
+    op.drop_constraint("nodes_group_id_fkey", "nodes", type_="foreignkey")
     
     if is_sqlite:
         with op.batch_alter_table("nodes") as batch_op:
@@ -240,14 +240,14 @@ def downgrade() -> None:
                 ["parent_id", "title", "user_id"],
             )
     else:
-        op.drop_constraint(
-            "unique title per parent per user/group", "nodes", type_="unique"
-        )
-        op.create_unique_constraint(
-            "unique title per parent per user",
-            "nodes",
-            ["parent_id", "title", "user_id"],
-        )
+    op.drop_constraint(
+        "unique title per parent per user/group", "nodes", type_="unique"
+    )
+    op.create_unique_constraint(
+        "unique title per parent per user",
+        "nodes",
+        ["parent_id", "title", "user_id"],
+    )
 
     with op.batch_alter_table("nodes") as batch_op:
         batch_op.alter_column(
@@ -258,17 +258,17 @@ def downgrade() -> None:
 
     # groups
     if not is_sqlite:
-        op.drop_constraint("groups_home_folder_id_fkey", "groups", type_="foreignkey")
-        op.drop_constraint("groups_inbox_folder_id_fkey", "groups", type_="foreignkey")
+    op.drop_constraint("groups_home_folder_id_fkey", "groups", type_="foreignkey")
+    op.drop_constraint("groups_inbox_folder_id_fkey", "groups", type_="foreignkey")
 
     op.drop_column("groups", "inbox_folder_id")
     op.drop_column("groups", "home_folder_id")
 
     # document_types
     if not is_sqlite:
-        op.drop_constraint(
-            "document_types_group_id_fkey", "document_types", type_="foreignkey"
-        )
+    op.drop_constraint(
+        "document_types_group_id_fkey", "document_types", type_="foreignkey"
+    )
     
     if is_sqlite:
         with op.batch_alter_table("document_types") as batch_op:
@@ -280,12 +280,12 @@ def downgrade() -> None:
                 "unique document type per user", ["name", "user_id"]
             )
     else:
-        op.drop_constraint(
-            "unique document type per user/group", "document_types", type_="unique"
-        )
-        op.create_unique_constraint(
-            "unique document type per user", "document_types", ["name", "user_id"]
-        )
+    op.drop_constraint(
+        "unique document type per user/group", "document_types", type_="unique"
+    )
+    op.create_unique_constraint(
+        "unique document type per user", "document_types", ["name", "user_id"]
+    )
 
     with op.batch_alter_table("document_types") as batch_op:
         batch_op.alter_column("user_id", existing_type=sa.UUID(), nullable=False)
@@ -294,9 +294,9 @@ def downgrade() -> None:
 
     # custom_fields
     if not is_sqlite:
-        op.drop_constraint(
-            "custom_fields_group_id_fkey", "custom_fields", type_="foreignkey"
-        )
+    op.drop_constraint(
+        "custom_fields_group_id_fkey", "custom_fields", type_="foreignkey"
+    )
 
     with op.batch_alter_table("custom_fields") as batch_op:
         batch_op.alter_column("user_id", existing_type=sa.UUID(), nullable=False)
