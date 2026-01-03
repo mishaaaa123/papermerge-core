@@ -9,7 +9,8 @@ import {
   currentDocVerUpdated,
   currentSharedNodeRootChanged,
   selectCurrentSharedNodeID,
-  selectLastPageSize
+  selectLastPageSize,
+  selectThumbnailsPanelOpen
 } from "@/features/ui/uiSlice"
 
 import SharedBreadcrumbs from "@/components/SharedBreadcrumb"
@@ -68,6 +69,7 @@ export default function SharedViewer() {
   const mode: PanelMode = useContext(PanelContext)
   const navigate = useNavigate()
   const dispatch = useAppDispatch()
+  const thumbnailsIsOpen = useAppSelector(s => selectThumbnailsPanelOpen(s, mode))
 
   // Password state for viewing password-protected documents
   // password: The password entered by the user (misha) - null if not entered yet
@@ -345,7 +347,7 @@ export default function SharedViewer() {
         <DocumentDetailsToggle />
       </Group>
       <Flex className={classes.inner} style={{height: "100%"}}>
-        <ThumbnailList />
+        {thumbnailsIsOpen && <ThumbnailList />}
         <ThumbnailsToggle />
         <PageList />
         <DocumentDetails
