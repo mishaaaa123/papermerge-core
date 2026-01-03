@@ -86,9 +86,20 @@ export default function PageListContainer({password}: Props) {
   ))
 
   useEffect(() => {
+    console.log("[PageList] useEffect triggered:", {
+      loadMore,
+      isGenerating,
+      allPreviewsAreAvailable,
+      nextPageNumber,
+      docVerID: docVer?.id
+    })
+    
     if (loadMore && !isGenerating) {
       if (!allPreviewsAreAvailable) {
+        console.log("[PageList] 🔴 Calling generateNextPreviews for page:", nextPageNumber)
         dispatch(generateNextPreviews({docVer, pageNumber: nextPageNumber, downloadUrl, password}))
+      } else {
+        console.log("[PageList] All previews available, skipping generateNextPreviews")
       }
     }
   }, [

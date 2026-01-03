@@ -28,6 +28,15 @@ interface Args {
 export const generateNextPreviews =
   ({docVer, pageNumber, size = "md", thumbnailListPageCount, password, downloadUrl}: Args) =>
   async (dispatch: AppDispatch) => {
+    console.log("[generateNextPreviews] 🔵 ACTION CALLED:", {
+      docVerID: docVer?.id,
+      pageNumber,
+      size,
+      hasPassword: !!password,
+      hasDownloadUrl: !!downloadUrl,
+      callStack: new Error().stack?.split('\n').slice(0, 8).join('\n')
+    })
+    
     if (!docVer) {
       return
     }
@@ -39,6 +48,7 @@ export const generateNextPreviews =
         ? DOC_VER_PAGINATION_THUMBNAIL_BATCH_SIZE
         : DOC_VER_PAGINATION_PAGE_BATCH_SIZE
 
+    console.log("[generateNextPreviews] 🔵 Dispatching generatePreviews with useCache: true")
     await dispatch(
       generatePreviews({
         docVer,
@@ -48,7 +58,8 @@ export const generateNextPreviews =
         thumbnailListPageCount,
         pageTotal: docVer.pages.length,
         password,
-        downloadUrl
+        downloadUrl,
+        useCache: true // Always use cache for subsequent page loads (scrolling) to avoid hitting download limits
       })
     )
 

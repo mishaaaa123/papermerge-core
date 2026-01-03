@@ -90,6 +90,15 @@ export async function downloadFromUrl(
   docVerID: UUID,
   password?: string
 ): Promise<DownloadResult> {
+  // Log stack trace to identify where download is being called from
+  const stackTrace = new Error().stack
+  console.log("[downloadFromUrl] 🔴 DOWNLOAD INITIATED:", {
+    downloadUrl,
+    docVerID,
+    hasPassword: !!password,
+    callStack: stackTrace?.split('\n').slice(0, 10).join('\n') // First 10 lines of stack
+  })
+  
   let url = downloadUrl
 
   // Add password as query parameter if provided
@@ -181,6 +190,14 @@ export async function downloadFromUrl(
 }
 
 export async function getDocLastVersion(docID: UUID, password?: string): Promise<DownloadResult> {
+  // Log stack trace to identify where download is being called from
+  const stackTrace = new Error().stack
+  console.log("[getDocLastVersion] 🔴 DOWNLOAD INITIATED:", {
+    docID,
+    hasPassword: !!password,
+    callStack: stackTrace?.split('\n').slice(0, 10).join('\n') // First 10 lines of stack
+  })
+  
   try {
     // Add cache-busting to ensure fresh download every time
     const cacheBuster = `_t=${Date.now()}`

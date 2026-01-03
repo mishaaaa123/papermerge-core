@@ -55,17 +55,35 @@ export default function ThumbnailListContainer({password}: Props) {
   ))
 
   useEffect(() => {
+    console.log("[ThumbnailList] useEffect (initial load):", {
+      pagesLength: pages.length,
+      isGenerating,
+      docVerID: docVer?.id
+    })
+    
     if (pages.length == 0 && !isGenerating) {
+      console.log("[ThumbnailList] 🔴 Calling generateNextPreviews for initial thumbnails (page 1)")
       dispatch(generateNextPreviews({docVer, size: "sm", pageNumber: 1, downloadUrl, password}))
     }
   }, [pages.length, docVer, isGenerating, downloadUrl, password, dispatch])
 
   useEffect(() => {
+    console.log("[ThumbnailList] useEffect (load more):", {
+      loadMore,
+      isGenerating,
+      allPreviewsAreAvailable,
+      nextPage: pageNumber + 1,
+      docVerID: docVer?.id
+    })
+    
     if (loadMore && !isGenerating) {
       if (!allPreviewsAreAvailable) {
+        console.log("[ThumbnailList] 🔴 Calling generateNextPreviews for page:", pageNumber + 1)
         dispatch(
           generateNextPreviews({docVer, size: "sm", pageNumber: pageNumber + 1, downloadUrl, password})
         )
+      } else {
+        console.log("[ThumbnailList] All previews available, skipping generateNextPreviews")
       }
     }
   }, [loadMore, isGenerating, allPreviewsAreAvailable, docVer, pageNumber, downloadUrl, password, dispatch])
