@@ -68,6 +68,10 @@ const router = createBrowserRouter([
         element: <Navigate to="/documents" replace />
       },
       {
+        path: "/home",
+        element: <Navigate to="/documents" replace />
+      },
+      {
         path: "/home/:folderId",
         element: <Home />,
         loader: homeLoader
